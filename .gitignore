@@ -1,0 +1,25 @@
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+.pub-cache/
+.pub/
+
+# Firebase
+functions/lib/
+functions/node_modules/
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Do NOT commit real Firebase secrets/config if you make this repo public
+# lib/firebase_options.dart is usually fine to commit (it's not a secret,
+# just client IDs) — but check your own comfort level.

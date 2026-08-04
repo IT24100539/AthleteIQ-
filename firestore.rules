@@ -1,0 +1,67 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function role() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isCoachOf(athleteUid) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/athletes/$(athleteUid)).data.coachUid == request.auth.uid;
+    }
+
+    // users/{uid} — role lookup only. A user can read/write their own doc;
+    // role is set once at signup and shouldn't be client-editable after.
+    match /users/{uid} {
+      allow read: if isSelf(uid);
+      allow create: if isSelf(uid);
+      allow update: if isSelf(uid) && request.resource.data.role == resource.data.role;
+    }
+
+    match /athletes/{athleteUid} {
+      // Section 17.1 — coach sees full evidence, athlete sees their own.
+      allow read: if isSelf(athleteUid) || isCoachOf(athleteUid);
+      allow create: if isSelf(athleteUid);
+      // Athlete can edit their own profile (sport, device tier) but never
+      // reassign their own coach — that's an invite/admin flow, not here.
+      allow update: if isSelf(athleteUid) &&
+        request.resource.data.coachUid == resource.data.coachUid;
+
+      match /checkins/{checkinId} {
+        // Only the athlete logs their own data — never the coach, and
+        // never another athlete.
+        allow read: if isSelf(athleteUid) || isCoachOf(athleteUid);
+        allow write: if isSelf(athleteUid);
+      }
+
+      match /riskResults/{docId} {
+        // Written only by the Cloud Function (admin SDK bypasses rules).
+        // MVP note: both coach and athlete can read this doc so the app
+        // doesn't crash on a permission error — the Flutter UI is what
+        // hides the recommendation from the athlete until
+        // recommendationStatus == 'approved' (see AthleteHomeScreen).
+        // Section 17.3's stricter guarantee — the athlete truly cannot
+        // read the raw pending score at the database level — needs a
+        // second, sanitized "athleteView" doc written post-approval.
+        // That split is a good Phase 2 hardening step; call it out in
+        // the guide rather than building it into the MVP.
+        allow read: if isSelf(athleteUid) || isCoachOf(athleteUid);
+        // Only the coach may change recommendationStatus (Section 6 / 11
+        // — Human Approval Step, sole approval authority).
+        allow update: if isCoachOf(athleteUid) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['recommendationStatus', 'recommendation', 'reviewedAt']);
+      }
+    }
+  }
+}
