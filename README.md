@@ -39,12 +39,5 @@ build guide (`AthleteIQ_Build_Guide.md`) for step-by-step setup.
 - Pain reports with LLM urgency triage, coach–athlete messaging, privacy
   settings, account deletion, and weekly reports
 
-## Not built yet (see guide's Roadmap section)
 
-- Garmin / Whoop integrations (requires vendor API approval)
-- Trained ML classifiers (Section 14.6) — v1 uses transparent rules,
-  which the doc itself says is the correct starting point
-- Coach-override learning, competition calendar awareness
-- Full store release (privacy policy hosting, Play/App Store listings, iOS
-  signing)
 # AthleteIQ-
