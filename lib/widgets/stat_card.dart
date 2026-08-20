@@ -15,22 +15,25 @@ class StatCard extends StatelessWidget {
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label.toUpperCase(),
-            style: const TextStyle(fontSize: 10, color: AppColors.textMuted, letterSpacing: 0.5),
+            style: TextStyle(fontSize: 10, color: AppColors.textMuted, letterSpacing: 0.5),
           ),
           const SizedBox(height: 4),
           Text(
             value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.spaceGrotesk(
               fontSize: 16,
               fontWeight: FontWeight.w700,
               color: valueColor ?? AppColors.textPrimary,
+              height: 1.15,
             ),
           ),
         ],

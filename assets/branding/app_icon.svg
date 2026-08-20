@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Source vector for AthleteIQ app icon. Colors from docs/wireframe.html.html -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="AthleteIQ">
+  <rect width="1024" height="1024" rx="224" fill="#2FE6B8"/>
+  <polyline
+    fill="none"
+    stroke="#06231C"
+    stroke-width="72"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    points="176,512 304,512 392,736 632,288 760,512 848,512"/>
+</svg>

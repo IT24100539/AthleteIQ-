@@ -1,0 +1,10 @@
+// Bundle ID is com.athleteiq.app (must match Android applicationId).
+// In Xcode: Runner target → Signing & Capabilities → set Team.
+// DEVELOPMENT_TEAM stays empty until you pick a team.
+
+PRODUCT_BUNDLE_IDENTIFIER = com.athleteiq.app
+DEVELOPMENT_TEAM =
+
+// Synced from pubspec.yaml via Flutter tooling:
+// FLUTTER_BUILD_NAME  → CFBundleShortVersionString (MARKETING_VERSION)
+// FLUTTER_BUILD_NUMBER → CFBundleVersion (CURRENT_PROJECT_VERSION)

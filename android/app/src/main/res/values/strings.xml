@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AthleteIQ</string>
+
+    <!-- Shown in Health Connect permission flows (Android 14+) and Play Console data-safety copy. -->
+    <string name="health_connect_rationale">
+        AthleteIQ reads resting heart rate, heart rate variability (HRV) when your device records it, sleep, workout duration, and steps from Health Connect to calculate training load, recovery trends, and injury-risk scores. We only read these metrics — we do not write data back to Health Connect. Most Android watches do not record HRV; that field is left blank rather than invented. Your coach sees wearable metrics only if you enable wearable sharing in Profile → Data sharing.
+    </string>
+
+    <string name="health_connect_resting_hr_rationale">
+        Resting heart rate helps AthleteIQ track recovery alongside your logged training sessions.
+    </string>
+    <string name="health_connect_hrv_rationale">
+        Heart rate variability (HRV) improves recovery scoring when your watch or phone records it in Health Connect.
+    </string>
+    <string name="health_connect_sleep_rationale">
+        Sleep duration is used with your training logs to estimate fatigue and recovery trends.
+    </string>
+    <string name="health_connect_steps_rationale">
+        Step count from Health Connect is stored with your wearable snapshot. It is not turned into a fake training-load number.
+    </string>
+
+    <string name="post_notifications_rationale">
+        AthleteIQ sends alerts when your coach approves a plan, when risk spikes, or when a wearable sync fails so you can reconnect your device.
+    </string>
+</resources>

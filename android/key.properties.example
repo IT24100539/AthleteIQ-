@@ -1,0 +1,30 @@
+# Copy this file to android/key.properties and fill in the passwords.
+# Never commit key.properties or the .jks — both are gitignored.
+
+storePassword=YOUR_KEYSTORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=upload
+storeFile=keystore/upload-keystore.jks
+
+# Generate the upload keystore once (keep a backup off this machine).
+#
+# PowerShell, from the android/ folder:
+#
+#   New-Item -ItemType Directory -Force -Path keystore | Out-Null
+#   keytool -genkeypair -v -storetype PKCS12 `
+#     -keystore keystore\upload-keystore.jks `
+#     -alias upload -keyalg RSA -keysize 2048 -validity 10000 `
+#     -dname "CN=AthleteIQ, OU=AthleteIQ, O=AthleteIQ, L=Unknown, ST=Unknown, C=US"
+#
+# You will be prompted for the store password (use the same value for
+# storePassword and keyPassword in key.properties).
+#
+# Then copy this example:
+#   Copy-Item key.properties.example key.properties
+# and replace YOUR_KEYSTORE_PASSWORD / YOUR_KEY_PASSWORD.
+#
+# macOS / Linux, from android/:
+#   mkdir -p keystore
+#   keytool -genkeypair -v -storetype PKCS12 \
+#     -keystore keystore/upload-keystore.jks \
+#     -alias upload -keyalg RSA -keysize 2048 -validity 10000

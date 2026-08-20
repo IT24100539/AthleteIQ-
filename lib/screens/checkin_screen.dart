@@ -1,7 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import '../models/athlete.dart';
 import '../models/checkin.dart';
 import '../services/firestore_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/athlete_sports.dart';
+import '../utils/friendly_error.dart';
+import '../utils/stream_fallback.dart';
+import '../widgets/manual_resting_hr_field.dart';
+import '../widgets/session_sport_picker.dart';
 
 class CheckInScreen extends StatefulWidget {
   final String athleteUid;
@@ -13,6 +21,7 @@ class CheckInScreen extends StatefulWidget {
 
 class _CheckInScreenState extends State<CheckInScreen> {
   final _fs = FirestoreService();
+  StreamSubscription<AthleteProfile>? _profileSub;
 
   bool _trainedToday = true;
   double _duration = 45; // minutes
@@ -21,21 +30,92 @@ class _CheckInScreenState extends State<CheckInScreen> {
   double _sleep = 7; // hours
   final _notes = TextEditingController();
   bool _saving = false;
+  bool _includeRhr = false;
+  double _restingHr = ManualRestingHrField.defaultBpm;
+  String? _deviceTier;
+  List<String> _sports = const [];
+  List<SportGroup> _sportGroups = const [];
+  String? _sessionSport;
+
+  bool get _showManualRhr {
+    final tier = _deviceTier;
+    if (tier == null) return false;
+    return AthleteProfile(
+      uid: widget.athleteUid,
+      name: '',
+      createdAt: DateTime.fromMillisecondsSinceEpoch(0),
+      deviceTier: tier,
+    ).allowsManualRestingHr;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _profileSub = emitOnError(
+      _fs.athleteProfile(widget.athleteUid),
+      AthleteProfile.fromMap(widget.athleteUid, {}),
+    ).listen((profile) {
+      if (!mounted) return;
+      setState(() {
+        _deviceTier = profile.deviceTier;
+        _sports = profile.sports;
+        _sportGroups = profile.sportGroups;
+        _sessionSport ??= profile.sport;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _profileSub?.cancel();
+    _notes.dispose();
+    super.dispose();
+  }
 
   Future<void> _submit() async {
     setState(() => _saving = true);
-    final checkIn = CheckIn(
-      id: '',
-      date: DateTime.now(),
-      sessionDurationMinutes: _trainedToday ? _duration.round() : null,
-      rpe: _trainedToday ? _rpe.round() : null,
-      fatigueScore: _fatigue.round(),
-      sleepHours: _sleep,
-      soreness: _notes.text.isEmpty ? null : _notes.text,
-      source: 'manual',
-    );
-    await _fs.submitCheckIn(widget.athleteUid, checkIn);
-    if (mounted) Navigator.of(context).pop();
+    try {
+      final checkIn = CheckIn(
+        id: '',
+        date: DateTime.now(),
+        sessionDurationMinutes: _trainedToday ? _duration.round() : 0,
+        rpe: _trainedToday ? _rpe.round() : 0,
+        fatigueScore: _fatigue.round(),
+        sleepHours: _sleep,
+        restingHeartRate:
+            _showManualRhr && _includeRhr ? _restingHr.roundToDouble() : null,
+        soreness: _notes.text.isEmpty ? null : _notes.text,
+        source: 'manual',
+        sessionSport: _sessionSport,
+        sessionSportGroup: groupForSession(
+          sports: _sports,
+          sportGroups: _sportGroups,
+          sessionSport: _sessionSport,
+        ).name,
+      );
+      await _fs.submitCheckIn(widget.athleteUid, checkIn);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Check-in saved')),
+        );
+      }
+    } on RiskEngineException catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyError(e))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -43,7 +123,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Daily check-in')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.screenEdge),
         children: [
           Text('Did you train today?', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
@@ -66,6 +146,14 @@ class _CheckInScreenState extends State<CheckInScreen> {
               ),
             ],
           ),
+          if (_trainedToday && _sports.length > 1) ...[
+            const SizedBox(height: 20),
+            SessionSportPicker(
+              sports: _sports,
+              selected: _sessionSport ?? _sports.first,
+              onSelected: (name) => setState(() => _sessionSport = name),
+            ),
+          ],
           if (_trainedToday) ...[
             const SizedBox(height: 20),
             _SliderField(
@@ -78,9 +166,11 @@ class _CheckInScreenState extends State<CheckInScreen> {
               onChanged: (v) => setState(() => _duration = v),
             ),
             _SliderField(
-              // Section 15.3 — wording changes per sport in the real app
-              // by reading the athlete's sportGroup; kept generic here.
-              label: 'How hard did that session feel? (RPE)',
+              label: rpePromptForGroup(groupForSession(
+                sports: _sports,
+                sportGroups: _sportGroups,
+                sessionSport: _sessionSport,
+              )),
               value: _rpe,
               min: 1,
               max: 10,
@@ -108,6 +198,15 @@ class _CheckInScreenState extends State<CheckInScreen> {
             display: '${_sleep.toStringAsFixed(1)} hrs',
             onChanged: (v) => setState(() => _sleep = v),
           ),
+          if (_showManualRhr) ...[
+            const SizedBox(height: 8),
+            ManualRestingHrField(
+              include: _includeRhr,
+              bpm: _restingHr,
+              onIncludeChanged: (v) => setState(() => _includeRhr = v),
+              onBpmChanged: (v) => setState(() => _restingHr = v),
+            ),
+          ],
           const SizedBox(height: 8),
           TextField(
             controller: _notes,

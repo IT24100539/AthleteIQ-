@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Splash mark only. Sits on #0B0D0C via flutter_native_splash. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="AthleteIQ">
+  <rect width="512" height="512" rx="112" fill="#2FE6B8"/>
+  <polyline
+    fill="none"
+    stroke="#06231C"
+    stroke-width="36"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    points="88,256 152,256 196,368 316,144 380,256 424,256"/>
+</svg>

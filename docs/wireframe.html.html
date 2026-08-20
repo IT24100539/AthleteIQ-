@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AthleteIQ — Complete app</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0B0D0C; font-family: 'Inter', sans-serif; padding: 64px 40px; }
+  .group-label { color: #EDEFEC; font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; margin: 0 0 20px; }
+  .group-label:not(:first-child) { margin-top: 40px; }
+  .row { display: flex; gap: 32px; overflow-x: auto; padding-bottom: 8px; }
+  .col { flex: 0 0 180px; }
+  .label { color: #6E736F; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 16px; }
+  .phone { width: 180px; height: 366px; background: #121412; border: 1px solid #2A2E2B; border-radius: 28px; overflow: hidden; position: relative; box-shadow: 0 24px 48px rgba(0,0,0,0.45); display: flex; flex-direction: column; }
+  .notch { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 46px; height: 5px; background: #2A2E2B; border-radius: 3px; z-index: 5; }
+  .statusbar { display: flex; justify-content: space-between; padding: 16px 14px 2px; font-size: 8px; font-weight: 600; color: #8A8F8C; }
+  .home-indicator { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); width: 46px; height: 3px; background: #3A3E3B; border-radius: 2px; z-index: 5; }
+  .mint { color: #2FE6B8; } .coral { color: #FF6A4D; } .muted { color: #8A8F8C; }
+
+  svg.icon { display: inline-block; vertical-align: middle; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+  .screen-body { flex: 1; overflow: hidden; position: relative; }
+  .tabbar { display: flex; border-top: 1px solid #1C1F1D; padding: 8px 6px 10px; background: #121412; }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 5px; color: #4E524F; }
+  .tab.active { color: #2FE6B8; }
+  .tab svg { width: 13px; height: 13px; }
+  .topnav { display: flex; align-items: center; gap: 8px; padding: 14px 14px 0; color: #8A8F8C; }
+  .topnav svg { width: 12px; height: 12px; }
+  .topnav-title { font-family: 'Space Grotesk', sans-serif; font-size: 9px; font-weight: 700; color: #fff; }
+
+  /* Onboarding carousel */
+  .carousel { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 20px; text-align: center; }
+  .carousel-icon { width: 56px; height: 56px; border-radius: 16px; background: #153A30; display:flex; align-items:center; justify-content:center; margin-bottom: 18px; color: #2FE6B8; }
+  .carousel-icon svg { width: 26px; height: 26px; }
+  .carousel h2 { font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; color: #fff; margin-bottom: 8px; line-height: 1.3; }
+  .carousel p { font-size: 7px; color: #8A8F8C; line-height: 1.6; }
+  .dots { position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; }
+  .dot-nav { width: 5px; height: 5px; border-radius: 50%; background: #2A2E2B; }
+  .dot-nav.active { background: #2FE6B8; width: 14px; border-radius: 3px; }
+  .skip { position: absolute; top: 18px; right: 14px; font-size: 6.5px; color: #6E736F; }
+
+  /* Splash */
+  .splash { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .splash-mark { width: 40px; height: 40px; border-radius: 11px; background: #2FE6B8; display:flex; align-items:center; justify-content:center; margin-bottom: 12px; color: #06231C; }
+  .splash-mark svg { width: 20px; height: 20px; }
+  .splash h1 { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 700; color: #fff; }
+  .splash p { font-size: 7px; color: #6E736F; margin-top: 4px; }
+
+  /* Sign in */
+  .signin { padding: 34px 16px 0; text-align: center; }
+  .mark { width: 26px; height: 26px; border-radius: 7px; background: #2FE6B8; margin: 0 auto 12px; display:flex; align-items:center; justify-content:center; color: #06231C; }
+  .mark svg { width: 13px; height: 13px; }
+  .signin h1 { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .signin p { font-size: 7px; color: #6E736F; margin-bottom: 14px; line-height: 1.5; }
+  .field { display:flex; align-items:center; gap:5px; background: #1C1F1D; border: 1px solid #2A2E2B; border-radius: 6px; height: 20px; padding: 0 7px; margin-bottom: 7px; color: #4E524F; }
+  .field svg { width: 9px; height: 9px; }
+  .field span { font-size: 6.5px; color: #4E524F; }
+  .btn-mint { background: #2FE6B8; color: #06231C; border-radius: 6px; height: 22px; display:flex; align-items:center; justify-content:center; gap: 4px; font-size: 7.5px; font-weight: 700; margin-top: 8px; }
+  .btn-mint svg { width: 10px; height: 10px; }
+  .btn-outline { display:flex; align-items:center; justify-content:center; gap: 5px; border: 1px solid #2A2E2B; border-radius: 6px; height: 20px; margin-top: 7px; font-size:7px; color:#B4B8B5; }
+  .btn-outline svg { width: 9px; height: 9px; }
+  .switch-link { font-size: 6.5px; color: #6E736F; margin-top: 12px; }
+  .switch-link b { color: #2FE6B8; font-weight: 600; }
+
+  /* Connect device */
+  .connect { padding: 24px 14px 0; }
+  .connect-title { font-family: 'Space Grotesk', sans-serif; font-size: 10px; font-weight: 700; color: #fff; margin-bottom: 3px; }
+  .connect-sub { font-size: 6.5px; color: #6E736F; margin-bottom: 12px; line-height: 1.5; }
+  .device-card { display:flex; align-items:center; justify-content:space-between; background: #1C1F1D; border: 1px solid #2A2E2B; border-radius: 8px; padding: 8px 9px; margin-bottom: 7px; }
+  .device-left { display:flex; align-items:center; gap: 7px; }
+  .device-icon { width: 20px; height: 20px; border-radius: 6px; background: #121412; border: 1px solid #2A2E2B; display:flex; align-items:center; justify-content:center; color: #B4B8B5; }
+  .device-icon svg { width: 10px; height: 10px; }
+  .device-name { font-size: 7.5px; color: #EDEFEC; font-weight: 600; }
+  .connect-btn { font-size: 6px; font-weight: 700; color: #2FE6B8; border: 1px solid #1F5B49; border-radius: 5px; padding: 4px 8px; }
+  .connected-badge { font-size: 6px; font-weight: 700; color: #2FE6B8; display:flex; align-items:center; gap:3px; }
+  .connected-badge svg { width: 8px; height: 8px; }
+  .manual-box { background: #1C1F1D; border-radius: 8px; padding: 9px; margin-top: 10px; }
+  .manual-label { font-size: 5.5px; color: #6E736F; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  .manual-text { font-size: 6.5px; color: #B4B8B5; margin-top: 4px; line-height: 1.5; }
+
+  /* Coach roster */
+  .roster { padding: 14px 14px 0; }
+  .roster-title { font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+  .roster-sub { font-size: 6.5px; color: #6E736F; margin-bottom: 5px; }
+  .search-box { display:flex; align-items:center; gap: 6px; background: #1C1F1D; border: 1px solid #2A2E2B; border-radius: 7px; height: 20px; padding: 0 8px; margin: 8px 0 10px; color: #4E524F; }
+  .search-box svg { width: 9px; height: 9px; }
+  .search-box span { font-size: 6.5px; }
+  .athlete-row { display:flex; align-items:center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #1C1F1D; }
+  .athlete-avatar { width: 24px; height: 24px; border-radius: 50%; background: #1C1F1D; border: 1px solid #2A2E2B; display:flex; align-items:center; justify-content:center; font-family: 'Space Grotesk', sans-serif; font-size: 7px; font-weight: 700; color: #B4B8B5; flex-shrink: 0; }
+  .athlete-info { flex: 1; min-width: 0; }
+  .athlete-name { font-size: 7px; font-weight: 600; color: #EDEFEC; }
+  .athlete-meta { font-size: 5.5px; color: #6E736F; margin-top: 1px; }
+  .risk-chip { font-size: 5px; font-weight: 700; padding: 2px 6px; border-radius: 10px; flex-shrink: 0; }
+  .risk-high { background: #2A1810; color: #FF6A4D; }
+  .risk-med { background: #241C10; color: #E6A83B; }
+  .risk-low { background: #10201C; color: #2FE6B8; }
+
+  /* Coach dashboard */
+  .dash { padding: 14px 14px 0; }
+  .dash-eyebrow { display:flex; align-items:center; gap:5px; font-size: 7px; color: #6E736F; }
+  .dash-eyebrow svg { width: 8px; height: 8px; }
+  .dash-title { font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; color: #fff; margin-top: 3px; margin-bottom: 10px; }
+  .ring-wrap { display: flex; justify-content: center; margin-bottom: 10px; }
+  .stat-row { display: flex; gap: 6px; margin-bottom: 8px; }
+  .stat { flex: 1; background: #1C1F1D; border-radius: 7px; padding: 6px; }
+  .stat .s-label { font-size: 5.5px; color: #6E736F; text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat .s-val { font-family: 'Space Grotesk', sans-serif; font-size: 9px; font-weight: 700; margin-top: 3px; }
+  .rec-box { background: #1C1F1D; border: 1px solid #2A2E2B; border-radius: 8px; padding: 8px; }
+  .rec-box .r-label { font-size: 5.5px; color: #FF6A4D; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  .rec-box .r-text { font-size: 6.5px; color: #EDEFEC; margin-top: 4px; line-height: 1.4; }
+  .pill-row { display: flex; gap: 4px; margin-top: 7px; }
+  .pill { flex:1; border-radius: 5px; font-size: 5.5px; font-weight: 600; text-align:center; padding: 4px 0; display:flex; align-items:center; justify-content:center; gap:3px; }
+  .pill svg { width: 7px; height: 7px; }
+  .pill-approve { background: #2FE6B8; color: #06231C; }
+  .pill-reject { border: 1px solid #3A3E3B; color: #B4B8B5; }
+
+  /* Performance forecast */
+  .perf { padding: 14px 14px 0; }
+  .perf-hero { background: linear-gradient(160deg,#153A30,#0F2A22); border-radius: 10px; padding: 11px; text-align:center; margin-bottom: 8px; }
+  .perf-score { font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: #2FE6B8; }
+  .perf-scale { font-size: 6.5px; color: #A8ADA9; margin-top: 2px; }
+  .perf-event { font-size: 6.5px; color: #EDEFEC; margin-top: 5px; font-weight: 600; }
+  .perf-drivers-title { font-size: 6px; font-weight: 700; color:#6E736F; text-transform: uppercase; letter-spacing: 0.05em; margin: 9px 0 5px; }
+  .driver-row { display:flex; justify-content:space-between; align-items:center; font-size: 6.5px; color: #D5D7D4; padding: 4px 0; border-bottom: 1px solid #1C1F1D; }
+  .driver-bar-bg { width: 40px; height: 4px; background: #1C1F1D; border-radius: 2px; }
+  .driver-bar { height: 4px; background: #2FE6B8; border-radius: 2px; }
+
+  /* Injury risk detail */
+  .risk { padding: 14px 14px 0; }
+  .acwr-box { background: #1C1F1D; border-radius: 8px; padding: 9px; margin-bottom: 7px; }
+  .acwr-label { font-size: 5.5px; color: #6E736F; text-transform: uppercase; letter-spacing: 0.05em; }
+  .acwr-val { font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; color: #FF6A4D; margin-top: 3px; }
+  .acwr-bar-bg { height: 6px; background: #121412; border-radius: 3px; margin-top: 7px; position: relative; overflow: hidden; }
+  .acwr-zone-safe { position:absolute; left: 26%; width: 30%; height: 100%; background: #153A30; }
+  .acwr-marker { position:absolute; top:-2px; width: 3px; height: 10px; background: #FF6A4D; border-radius: 2px; left: 68%; }
+  .acwr-caption { font-size: 5.5px; color: #6E736F; margin-top: 5px; }
+  .signal-row { display:flex; justify-content:space-between; align-items:center; font-size: 6.5px; color: #D5D7D4; padding: 5px 0; border-bottom: 1px solid #1C1F1D; }
+  .signal-tag { font-size: 5px; font-weight: 700; padding: 2px 5px; border-radius: 4px; }
+  .tag-up { background: #2A1810; color: #FF6A4D; }
+  .tag-down { background: #10201C; color: #2FE6B8; }
+
+  /* Why this call */
+  .why { padding: 14px 14px 0; }
+  .why-sub { font-size: 6.5px; color: #6E736F; margin-bottom: 10px; }
+  .factor { background: #1C1F1D; border-radius: 7px; padding: 7px 8px; margin-bottom: 6px; }
+  .factor-top { display:flex; justify-content:space-between; align-items:center; }
+  .factor-name { font-size: 7px; font-weight: 600; color: #EDEFEC; }
+  .factor-badge { font-size: 5px; font-weight: 700; padding: 2px 5px; border-radius: 4px; }
+  .badge-high { background: #2A1810; color: #FF6A4D; }
+  .badge-med { background: #241C10; color: #E6A83B; }
+  .factor-desc { font-size: 6px; color: #8A8F8C; margin-top: 4px; line-height: 1.45; }
+  .source-box { background: #10201C; border: 1px solid #1F5B49; border-radius: 7px; padding: 8px; margin-top: 6px; }
+  .source-label { font-size: 5.5px; color: #2FE6B8; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  .source-text { font-size: 6px; color: #C4E8DC; margin-top: 4px; line-height: 1.45; }
+
+  /* Trends */
+  .trend { padding: 14px 14px 0; }
+  .trend-title { font-family: 'Space Grotesk', sans-serif; font-size: 10px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+  .trend-sub { font-size: 6.5px; color: #6E736F; margin-bottom: 10px; }
+  .chart-box { background: #1C1F1D; border-radius: 8px; padding: 8px 8px 4px; }
+  .pattern { background: #2A1810; border: 1px solid #4A2A18; border-radius: 8px; padding: 8px; margin-top: 8px; }
+  .pattern-label { font-size: 5.5px; color: #FF6A4D; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  .pattern-text { font-size: 6.5px; color: #EDEFEC; margin-top: 4px; line-height: 1.4; }
+
+  /* Athlete status */
+  .status { padding: 14px 14px 0; }
+  .status-hero { background: linear-gradient(160deg,#153A30,#0F2A22); border-radius: 10px; padding: 10px; }
+  .s-eyebrow { font-size: 6px; color: #2FE6B8; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  .s-head { font-family: 'Space Grotesk', sans-serif; font-size: 9px; font-weight: 700; color: #fff; margin-top: 5px; line-height: 1.3; }
+  .s-sub { font-size: 6.5px; color: #A8ADA9; margin-top: 5px; line-height: 1.45; }
+  .plan-title { font-size: 6.5px; font-weight: 700; color:#6E736F; text-transform: uppercase; letter-spacing: 0.05em; margin: 10px 0 5px; }
+  .plan-row { display:flex; justify-content:space-between; align-items:center; font-size: 6.5px; color:#D5D7D4; padding: 4px 0; border-bottom: 1px solid #1C1F1D; }
+  .dot { width: 5px; height: 5px; border-radius: 50%; display:inline-block; margin-right: 5px; }
+  .dot-rest { background: #3A3E3B; } .dot-active { background: #2FE6B8; }
+
+  /* Chat */
+  .chat { padding: 14px 12px 0; display: flex; flex-direction: column; height: 100%; }
+  .bubble { max-width: 80%; border-radius: 9px; padding: 7px 8px; font-size: 6.5px; line-height: 1.45; margin-bottom: 6px; }
+  .bubble-user { background: #2FE6B8; color: #06231C; font-weight: 500; align-self: flex-end; margin-left: auto; }
+  .bubble-ai { background: #1C1F1D; color: #D5D7D4; border: 1px solid #2A2E2B; }
+  .chat-input { margin-top: auto; display:flex; align-items:center; justify-content:space-between; background: #1C1F1D; border: 1px solid #2A2E2B; border-radius: 14px; height: 20px; padding: 0 8px; margin-bottom: 10px; }
+  .chat-input span { font-size: 6px; color: #4E524F; }
+  .chat-input svg { width: 9px; height: 9px; color: #2FE6B8; }
+
+  /* Weekly report */
+  .report { padding: 14px 14px 0; }
+  .report-title { font-family: 'Space Grotesk', sans-serif; font-size: 10px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+  .report-sub { font-size: 6.5px; color: #6E736F; margin-bottom: 10px; }
+  .report-summary { background: #1C1F1D; border-radius: 8px; padding: 9px; margin-bottom: 7px; }
+  .report-summary-text { font-size: 6.5px; color: #D5D7D4; line-height: 1.5; }
+  .report-row { display:flex; justify-content:space-between; font-size: 6.5px; color: #B4B8B5; padding: 5px 0; border-bottom: 1px solid #1C1F1D; }
+  .report-row .r-num { font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: #EDEFEC; }
+  .export-btn { margin-top: 9px; display:flex; align-items:center; justify-content:center; gap:5px; background: #1C1F1D; border: 1px solid #2A2E2B; border-radius: 6px; height: 20px; font-size: 6.5px; font-weight: 600; color: #EDEFEC; }
+  .export-btn svg { width: 9px; height: 9px; }
+
+  /* Notifications */
+  .notif { padding: 14px 14px 0; }
+  .notif-title { font-family: 'Space Grotesk', sans-serif; font-size: 10px; font-weight: 700; color: #fff; margin-bottom: 10px; }
+  .notif-item { display:flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid #1C1F1D; }
+  .notif-icon { width: 20px; height: 20px; border-radius: 6px; background: #1C1F1D; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .notif-icon svg { width: 10px; height: 10px; }
+  .notif-text { font-size: 6.5px; color: #D5D7D4; line-height: 1.4; }
+  .notif-time { font-size: 5.5px; color: #4E524F; margin-top: 2px; }
+
+  /* Profile */
+  .profile { padding: 14px 14px 0; }
+  .profile-head { display:flex; align-items:center; gap: 8px; margin-bottom: 14px; }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; background: #1C1F1D; border: 1px solid #2A2E2B; display:flex; align-items:center; justify-content:center; font-family: 'Space Grotesk', sans-serif; font-size: 10px; font-weight: 700; color: #2FE6B8; }
+  .profile-name { font-size: 8.5px; font-weight: 700; color: #fff; }
+  .profile-sub { font-size: 6px; color: #6E736F; margin-top: 2px; }
+  .settings-row { display:flex; align-items:center; justify-content:space-between; padding: 8px 0; border-bottom: 1px solid #1C1F1D; }
+  .settings-left { display:flex; align-items:center; gap: 7px; font-size: 7px; color: #D5D7D4; }
+  .settings-left svg { width: 10px; height: 10px; color: #8A8F8C; }
+  .chev { width: 9px; height: 9px; color: #4E524F; }
+  .toggle { width: 22px; height: 12px; border-radius: 6px; background: #2FE6B8; position: relative; }
+  .toggle::after { content:''; position:absolute; top:2px; right:2px; width:8px; height:8px; border-radius:50%; background:#06231C; }
+  .toggle.off { background: #2A2E2B; }
+  .toggle.off::after { left: 2px; right: auto; background: #6E736F; }
+
+  /* Manual log entry */
+  .mlog { padding: 14px 14px 0; }
+  .mlog-sub { font-size: 6.5px; color: #6E736F; margin-bottom: 12px; }
+  .mlog-field { margin-bottom: 11px; }
+  .mlog-label { font-size: 6px; font-weight: 600; color: #B4B8B5; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; display:block; }
+  .chip-row { display: flex; gap: 5px; }
+  .chip-opt { flex: 1; text-align: center; padding: 5px 0; border-radius: 5px; border: 1px solid #2A2E2B; font-size: 6px; color: #8A8F8C; }
+  .chip-opt.sel { background: #2FE6B8; color: #06231C; border-color: #2FE6B8; font-weight: 700; }
+  .slider-track { height: 5px; background: #1C1F1D; border-radius: 3px; position: relative; margin-top: 8px; }
+  .slider-fill { height: 5px; background: #2FE6B8; border-radius: 3px; width: 60%; }
+  .slider-dot { position: absolute; top: -3px; left: 60%; width: 11px; height: 11px; border-radius: 50%; background: #fff; transform: translateX(-50%); box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+  .slider-scale { display:flex; justify-content:space-between; font-size: 5px; color: #4E524F; margin-top: 4px; }
+  .mlog-save { margin-top: 6px; background: #2FE6B8; color: #06231C; border-radius: 6px; height: 22px; display:flex; align-items:center; justify-content:center; gap:4px; font-size: 7.5px; font-weight: 700; }
+  .mlog-save svg { width: 10px; height: 10px; }
+
+  /* Athlete profile setup */
+  .setup { padding: 24px 14px 0; }
+  .setup-title { font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; color: #fff; margin-bottom: 3px; }
+  .setup-sub { font-size: 6.5px; color: #6E736F; margin-bottom: 14px; }
+  .setup-progress { display:flex; gap: 4px; margin-bottom: 16px; }
+  .setup-step { flex: 1; height: 3px; border-radius: 2px; background: #1C1F1D; }
+  .setup-step.done { background: #2FE6B8; }
+  .setup-field-label { font-size: 6px; font-weight: 600; color: #B4B8B5; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; display:block; }
+  .setup-input { background: #1C1F1D; border: 1px solid #2A2E2B; border-radius: 6px; height: 20px; margin-bottom: 12px; display:flex; align-items:center; padding: 0 8px; font-size: 6.5px; color: #4E524F; }
+  .setup-chip-row { display:flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; }
+  .setup-chip { padding: 5px 9px; border-radius: 12px; border: 1px solid #2A2E2B; font-size: 6px; color: #8A8F8C; }
+  .setup-chip.sel { background: #2FE6B8; color: #06231C; border-color: #2FE6B8; font-weight: 700; }
+
+  /* Pain / injury report */
+  .pain { padding: 14px 14px 0; }
+  .pain-sub { font-size: 6.5px; color: #6E736F; margin-bottom: 12px; line-height: 1.5; }
+  .body-row { display:flex; align-items:center; justify-content:space-between; background: #1C1F1D; border-radius: 7px; padding: 7px 9px; margin-bottom: 6px; }
+  .body-left { display:flex; align-items:center; gap: 7px; font-size: 7px; color: #EDEFEC; font-weight: 600; }
+  .body-left svg { width: 10px; height: 10px; color: #FF6A4D; }
+  .severity-dots { display:flex; gap: 3px; }
+  .sev-dot { width: 6px; height: 6px; border-radius: 50%; background: #2A2E2B; }
+  .sev-dot.on { background: #FF6A4D; }
+  .add-area-btn { display:flex; align-items:center; justify-content:center; gap: 5px; border: 1px dashed #2A2E2B; border-radius: 7px; height: 22px; font-size: 6.5px; color: #6E736F; margin-top: 6px; }
+  .add-area-btn svg { width: 9px; height: 9px; }
+  .pain-note { background: #2A1810; border: 1px solid #4A2A18; border-radius: 8px; padding: 8px; margin-top: 12px; font-size: 6.5px; color: #EDEFEC; line-height: 1.5; }
+
+  /* Training calendar */
+  .cal { padding: 14px 14px 0; }
+  .cal-title { font-family: 'Space Grotesk', sans-serif; font-size: 10px; font-weight: 700; color: #fff; margin-bottom: 10px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-bottom: 12px; }
+  .cal-dow { font-size: 5px; color: #4E524F; text-align: center; }
+  .cal-day { aspect-ratio: 1; border-radius: 4px; background: #1C1F1D; display:flex; align-items:center; justify-content:center; font-size: 5.5px; color: #8A8F8C; position: relative; }
+  .cal-day.rest { background: #17191A; color: #4E524F; }
+  .cal-day.done { background: #153A30; color: #2FE6B8; font-weight: 700; }
+  .cal-day.today { border: 1px solid #2FE6B8; color: #fff; font-weight: 700; }
+  .cal-legend { display:flex; gap: 10px; font-size: 5.5px; color: #6E736F; }
+  .cal-legend span { display:flex; align-items:center; gap: 3px; }
+  .legend-dot { width: 6px; height: 6px; border-radius: 2px; }
+
+  /* Athlete performance view */
+  .aperf { padding: 14px 14px 0; }
+  .aperf-hero { background: linear-gradient(160deg,#153A30,#0F2A22); border-radius: 10px; padding: 14px; text-align:center; }
+  .aperf-icon { width: 28px; height: 28px; border-radius: 8px; background: rgba(47,230,184,0.15); display:flex; align-items:center; justify-content:center; margin: 0 auto 8px; color: #2FE6B8; }
+  .aperf-icon svg { width: 14px; height: 14px; }
+  .aperf-head { font-family: 'Space Grotesk', sans-serif; font-size: 10px; font-weight: 700; color: #fff; line-height: 1.35; }
+  .aperf-sub { font-size: 6.5px; color: #A8ADA9; margin-top: 6px; line-height: 1.5; }
+  .aperf-tip-title { font-size: 6px; font-weight: 700; color:#6E736F; text-transform: uppercase; letter-spacing: 0.05em; margin: 14px 0 6px; }
+  .aperf-tip { background: #1C1F1D; border-radius: 7px; padding: 8px; font-size: 6.5px; color: #D5D7D4; line-height: 1.5; margin-bottom: 6px; }
+
+  /* Coach message */
+  .msg { padding: 14px 12px 0; display: flex; flex-direction: column; height: 100%; }
+  .msg-head { display:flex; align-items:center; gap: 7px; margin-bottom: 10px; }
+  .msg-avatar { width: 22px; height: 22px; border-radius: 50%; background: #1C1F1D; border: 1px solid #2A2E2B; display:flex; align-items:center; justify-content:center; font-family:'Space Grotesk',sans-serif; font-size: 7px; font-weight: 700; color: #B4B8B5; }
+  .msg-name { font-size: 7.5px; font-weight: 700; color: #fff; }
+  .msg-role { font-size: 5.5px; color: #6E736F; }
+  .msg-input { margin-top: auto; display:flex; align-items:center; justify-content:space-between; background: #1C1F1D; border: 1px solid #2A2E2B; border-radius: 14px; height: 20px; padding: 0 8px; margin-bottom: 10px; }
+  .msg-input span { font-size: 6px; color: #4E524F; }
+  .msg-input svg { width: 9px; height: 9px; color: #2FE6B8; }
+
+  /* Priority queue (coach team overview sorted by risk) */
+  .priority-banner { display:flex; align-items:center; gap:5px; background:#1C1F1D; border:1px solid #2A2E2B; border-radius:7px; padding:6px 8px; margin-bottom:8px; font-size:6px; color:#8A8F8C; }
+  .priority-banner svg { width:8px; height:8px; color:#2FE6B8; flex-shrink:0; }
+  .priority-row { display:flex; align-items:center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #1C1F1D; }
+  .priority-num { width:12px; font-family:'Space Grotesk',sans-serif; font-size:7px; font-weight:700; color:#4E524F; }
+  .priority-metric { font-size: 5.5px; color: #6E736F; margin-top: 1px; }
+
+  /* Conflict / orchestrator decision */
+  .conflict { padding: 14px 14px 0; }
+  .conflict-sub { font-size: 6.5px; color: #6E736F; margin-bottom: 10px; line-height: 1.5; }
+  .conflict-pair { display:flex; gap: 6px; margin-bottom: 8px; }
+  .conflict-card { flex:1; background:#1C1F1D; border:1px solid #2A2E2B; border-radius:8px; padding:8px; }
+  .conflict-card.win { border-color:#1F5B49; background:#10201C; }
+  .cc-label { font-size:5px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#6E736F; }
+  .cc-val { font-family:'Space Grotesk',sans-serif; font-size:12px; font-weight:700; color:#EDEFEC; margin-top:4px; }
+  .cc-tag { font-size:5px; font-weight:700; margin-top:6px; display:inline-block; padding:2px 5px; border-radius:4px; }
+  .cc-tag.wins { background:#153A30; color:#2FE6B8; }
+  .cc-tag.defer { background:#241C10; color:#6E736F; }
+  .verdict-box { background: linear-gradient(160deg,#153A30,#0F2A22); border-radius:8px; padding:9px; }
+  .verdict-label { font-size:5.5px; font-weight:700; color:#2FE6B8; text-transform:uppercase; letter-spacing:0.05em; }
+  .verdict-text { font-size:6.5px; color:#EDEFEC; margin-top:4px; line-height:1.5; }
+  .rule-note { font-size:5.5px; color:#6E736F; margin-top: 8px; line-height:1.5; }
+
+  /* Modify recommendation (coach edits before sending) */
+  .modify-current { background:#1C1F1D; border-radius:7px; padding:7px 8px; margin-bottom:11px; font-size:6.5px; color:#8A8F8C; line-height:1.5; }
+  .modify-current b { color:#EDEFEC; }
+  .modify-save-row { display:flex; gap:5px; margin-top: 5px; }
+  .modify-save { flex:1; background:#2FE6B8; color:#06231C; border-radius:6px; height:22px; display:flex; align-items:center; justify-content:center; gap:4px; font-size:7px; font-weight:700; }
+  .modify-save svg { width: 9px; height: 9px; }
+  .modify-cancel { flex:1; border:1px solid #3A3E3B; color:#B4B8B5; border-radius:6px; height:22px; display:flex; align-items:center; justify-content:center; font-size:7px; }
+
+  /* Supporting research (knowledge agent) */
+  .research { padding: 14px 14px 0; }
+  .research-sub { font-size:6.5px; color:#6E736F; margin-bottom: 10px; line-height:1.5; }
+  .cite-card { background:#1C1F1D; border:1px solid #2A2E2B; border-radius:8px; padding:8px; margin-bottom: 7px; }
+  .cite-tag { font-size:5px; font-weight:700; color:#2FE6B8; text-transform:uppercase; letter-spacing:0.05em; }
+  .cite-text { font-size:6.5px; color:#D5D7D4; margin-top:4px; line-height:1.5; }
+  .cite-src { font-size:5.5px; color:#6E736F; margin-top:6px; }
+  .research-caveat { background:#1C1F1D; border-left: 2px solid #E6A83B; border-radius: 4px; padding: 7px 8px; margin-top: 4px; font-size: 6px; color: #B4B8B5; line-height: 1.5; }
+
+  /* Data sharing consent */
+  .consent { padding: 14px 14px 0; }
+  .consent-sub { font-size:6.5px; color:#6E736F; margin-bottom:10px; line-height:1.5; }
+  .consent-row { display:flex; align-items:center; justify-content:space-between; padding: 8px 0; border-bottom:1px solid #1C1F1D; gap: 8px; }
+  .consent-name { font-size:7px; font-weight:600; color:#EDEFEC; }
+  .consent-desc { font-size:5.5px; color:#6E736F; margin-top:2px; line-height:1.4; }
+
+  /* Empty / error states */
+  .empty-wrap { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding: 0 18px; }
+  .empty-icon { width:34px; height:34px; border-radius:10px; background:#1C1F1D; display:flex; align-items:center; justify-content:center; margin-bottom:12px; color:#6E736F; }
+  .empty-icon svg { width:16px; height:16px; }
+  .empty-icon.warn { background:#2A1810; color:#FF6A4D; }
+  .empty-title { font-family:'Space Grotesk',sans-serif; font-size:9.5px; font-weight:700; color:#fff; margin-bottom:6px; line-height:1.35; }
+  .empty-text { font-size:6.5px; color:#6E736F; line-height:1.6; }
+  .empty-btn { margin-top: 14px; border: 1px solid #2A2E2B; border-radius: 6px; padding: 6px 12px; font-size: 6.5px; font-weight: 600; color: #EDEFEC; }
+
+  /* Tier badges (adaptive data tiers) */
+  .tier-tag { font-size: 4.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 5px; border-radius: 4px; display: inline-block; margin-top: 2px; }
+  .tier-full { background: #153A30; color: #2FE6B8; }
+  .tier-partial { background: #241C10; color: #E6A83B; }
+  .tier-manual { background: #1C1F1D; color: #6E736F; border: 1px solid #2A2E2B; }
+  .device-name-wrap { display:flex; flex-direction:column; gap: 2px; }
+
+  /* Data completeness banner (coach dashboard) */
+  .data-banner { display:flex; align-items:center; gap:6px; background:#1C1F1D; border:1px solid #2A2E2B; border-radius:7px; padding:6px 8px; margin-bottom:9px; }
+  .data-banner svg { width:9px; height:9px; color:#E6A83B; flex-shrink:0; }
+  .data-banner-text { font-size: 5.5px; color: #B4B8B5; line-height: 1.4; }
+  .data-banner-text b { color: #EDEFEC; }
+  .data-banner.full svg { color: #2FE6B8; }
+
+  /* Your data tier (onboarding explainer) */
+  .tiers { padding: 24px 14px 0; }
+  .tiers-title { font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; color: #fff; margin-bottom: 3px; }
+  .tiers-sub { font-size: 6.5px; color: #6E736F; margin-bottom: 12px; line-height: 1.5; }
+  .tier-card { background:#1C1F1D; border:1px solid #2A2E2B; border-radius:8px; padding:8px; margin-bottom: 7px; }
+  .tier-card.sel { border-color: #1F5B49; background: #10201C; }
+  .tier-card-top { display:flex; align-items:center; justify-content:space-between; }
+  .tier-card-name { font-size: 7px; font-weight: 700; color: #EDEFEC; }
+  .tier-card-desc { font-size: 5.5px; color: #6E736F; margin-top: 4px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+<defs>
+  <symbol id="i-activity" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-google" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><text x="12" y="16" text-anchor="middle" font-size="11" fill="currentColor" stroke="none" font-family="Inter">G</text></symbol>
+  <symbol id="i-apple-device" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y1="18" x2="13" y2="18"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
+  <symbol id="i-arrow-left" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></symbol>
+  <symbol id="i-watch" viewBox="0 0 24 24"><rect x="6" y="7" width="12" height="10" rx="2"/><path d="M9 7V4h6v3M9 17v3h6v-3"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 21s-7-4.4-9.7-8.7C.5 9 2 5 6 5c2 0 3.3 1 4.5 2.5C11.7 6 13 5 15 5c4 0 5.5 4 3.7 7.3C19 16.6 12 21 12 21Z"/></symbol>
+  <symbol id="i-heartbeat" viewBox="0 0 24 24"><path d="M22 12h-4l-2 6-4-12-2 6H2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><line x1="4" y1="20" x2="4" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="20" y1="20" x2="20" y2="14"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M2 21c0-3.5 3-6 7-6s7 2.5 7 6"/><path d="M16 3.5a4 4 0 0 1 0 7.8M22 21c0-3-2-5-5-5.8"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+  <symbol id="i-brain" viewBox="0 0 24 24"><path d="M9 2a3 3 0 0 0-3 3v1a3 3 0 0 0-2 5 3 3 0 0 0 2 5v1a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M15 2a3 3 0 0 1 3 3v1a3 3 0 0 1 2 5 3 3 0 0 1-2 5v1a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5Z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v16H6.5A2.5 2.5 0 0 0 4 20.5Z"/><path d="M4 4.5v16"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="i-moonstar" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-.5 0-1-.1-1.5A7 7 0 0 1 12 3Z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+  <symbol id="i-bodypin" viewBox="0 0 24 24"><path d="M12 21s-6-4-6-9a6 6 0 0 1 12 0c0 5-6 9-6 9Z"/><circle cx="12" cy="10" r="2"/></symbol>
+  <symbol id="i-msg" viewBox="0 0 24 24"><path d="M4 4h16v12H8l-4 4Z"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+</defs>
+</svg>
+
+<div class="group-label">Onboarding</div>
+<div class="row">
+
+  <div class="col">
+    <div class="label">Intro 1</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen-body">
+        <div class="skip">Skip</div>
+        <div class="carousel">
+          <div class="carousel-icon"><svg class="icon"><use href="#i-brain"/></svg></div>
+          <h2>See risk before it becomes injury</h2>
+          <p>AthleteIQ watches your training load and recovery every day, not just at check-ins.</p>
+        </div>
+        <div class="dots"><div class="dot-nav active"></div><div class="dot-nav"></div><div class="dot-nav"></div></div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Intro 2</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen-body">
+        <div class="skip">Skip</div>
+        <div class="carousel">
+          <div class="carousel-icon"><svg class="icon"><use href="#i-shield"/></svg></div>
+          <h2>Your coach always decides</h2>
+          <p>AthleteIQ recommends. Your coach reviews and approves every change before you see it.</p>
+        </div>
+        <div class="dots"><div class="dot-nav"></div><div class="dot-nav active"></div><div class="dot-nav"></div></div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Intro 3</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen-body">
+        <div class="skip">Skip</div>
+        <div class="carousel">
+          <div class="carousel-icon"><svg class="icon"><use href="#i-book"/></svg></div>
+          <h2>Grounded in sports science</h2>
+          <p>Every explanation is backed by real research, not just a black-box number.</p>
+        </div>
+        <div class="dots"><div class="dot-nav"></div><div class="dot-nav"></div><div class="dot-nav active"></div></div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Splash</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen-body">
+        <div class="splash">
+          <div class="splash-mark"><svg class="icon"><use href="#i-activity"/></svg></div>
+          <h1>AthleteIQ</h1>
+          <p>Loading your data…</p>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Sign in</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="signin">
+          <div class="mark"><svg class="icon"><use href="#i-activity"/></svg></div>
+          <h1>AthleteIQ</h1>
+          <p>Track load, catch risk early,<br>train with confidence</p>
+          <div class="field"><svg class="icon"><use href="#i-mail"/></svg><span>Email address</span></div>
+          <div class="field"><svg class="icon"><use href="#i-lock"/></svg><span>Password</span></div>
+          <div class="btn-mint"><span>Continue</span><svg class="icon"><use href="#i-arrow-right"/></svg></div>
+          <div class="btn-outline"><svg class="icon"><use href="#i-google"/></svg><span>Continue with Google</span></div>
+          <div class="btn-outline"><svg class="icon"><use href="#i-apple-device"/></svg><span>Continue with Apple</span></div>
+          <div class="switch-link">New coach? <b>Create an account</b></div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Choose your role</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="setup">
+          <div class="setup-title">How will you use AthleteIQ?</div>
+          <div class="setup-sub">This decides your dashboard, so choose carefully — you can invite the other side later</div>
+
+          <div class="tier-card sel">
+            <div class="tier-card-top">
+              <span class="tier-card-name"><svg class="icon" style="width:11px;height:11px;margin-right:5px;vertical-align:-2px;"><use href="#i-users"/></svg>I'm a Coach</span>
+              <span class="tier-tag tier-full">Selected</span>
+            </div>
+            <div class="tier-card-desc">Monitor your whole team, review risk and performance calls, and approve every training change before an athlete sees it.</div>
+          </div>
+          <div class="tier-card">
+            <div class="tier-card-top">
+              <span class="tier-card-name"><svg class="icon" style="width:11px;height:11px;margin-right:5px;vertical-align:-2px;"><use href="#i-user"/></svg>I'm an Athlete</span>
+            </div>
+            <div class="tier-card-desc">Log how you feel, see your own risk and readiness, and get plain-language answers — your coach approves any change first.</div>
+          </div>
+
+          <div class="manual-text" style="margin-top:2px;">Joining an existing team? Use the invite code your coach sent instead of creating one from scratch.</div>
+          <div class="btn-mint" style="margin-top:12px;"><span>Continue</span><svg class="icon"><use href="#i-arrow-right"/></svg></div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Connect device</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="connect">
+          <div class="connect-title">Connect your data</div>
+          <div class="connect-sub">So AthleteIQ can track load and recovery automatically.</div>
+          <div class="device-card">
+            <div class="device-left"><div class="device-icon"><svg class="icon"><use href="#i-apple-device"/></svg></div>
+              <div class="device-name-wrap"><div class="device-name">Apple Watch</div><span class="tier-tag tier-full">Tier 1 · Full</span></div>
+            </div>
+            <div class="connected-badge"><svg class="icon"><use href="#i-check"/></svg><span>Connected</span></div>
+          </div>
+          <div class="device-card">
+            <div class="device-left"><div class="device-icon"><svg class="icon"><use href="#i-watch"/></svg></div>
+              <div class="device-name-wrap"><div class="device-name">Garmin</div><span class="tier-tag tier-full">Tier 1 · Full</span></div>
+            </div>
+            <div class="connect-btn">Connect</div>
+          </div>
+          <div class="device-card">
+            <div class="device-left"><div class="device-icon"><svg class="icon"><use href="#i-heartbeat"/></svg></div>
+              <div class="device-name-wrap"><div class="device-name">Whoop</div><span class="tier-tag tier-full">Tier 1 · Full</span></div>
+            </div>
+            <div class="connect-btn">Connect</div>
+          </div>
+          <div class="device-card">
+            <div class="device-left"><div class="device-icon"><svg class="icon"><use href="#i-watch"/></svg></div>
+              <div class="device-name-wrap"><div class="device-name">Honor / Redmi / other</div><span class="tier-tag tier-partial">Tier 2 · Partial</span></div>
+            </div>
+            <div class="connect-btn">Connect</div>
+          </div>
+          <div class="manual-box">
+            <div class="manual-label">No device? Tap here <span class="tier-tag tier-manual" style="margin-left:5px;">Tier 3 · Manual</span></div>
+            <div class="manual-text">Log training and how you feel manually each day — see the "Manual daily log" screen.</div>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Your data tier</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="topnav"><svg class="icon"><use href="#i-arrow-left"/></svg><span class="topnav-title">How we'll score you</span></div>
+      <div class="screen-body">
+        <div class="tiers">
+          <div class="tiers-sub">Based on what you connected, here's what AthleteIQ can measure for you today.</div>
+
+          <div class="tier-card sel">
+            <div class="tier-card-top"><span class="tier-card-name">Tier 1 · Full</span><span class="tier-tag tier-full">Active</span></div>
+            <div class="tier-card-desc">HRV, training load, ACWR, sleep and fatigue all included. Most accurate risk score.</div>
+          </div>
+          <div class="tier-card">
+            <div class="tier-card-top"><span class="tier-card-name">Tier 2 · Partial</span></div>
+            <div class="tier-card-desc">Training load, ACWR, sleep and fatigue — no HRV signal. Still a working risk score, just one input lighter.</div>
+          </div>
+          <div class="tier-card">
+            <div class="tier-card-top"><span class="tier-card-name">Tier 3 · Manual</span></div>
+            <div class="tier-card-desc">Same model as Tier 2, fed entirely by your daily check-in. No wearable needed at all.</div>
+          </div>
+
+          <div class="manual-text" style="margin-top:2px;">You can upgrade tiers any time by connecting a new device — nothing else changes.</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Profile setup</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="topnav"><svg class="icon"><use href="#i-arrow-left"/></svg><span class="topnav-title">Set up profile</span></div>
+      <div class="screen-body">
+        <div class="setup">
+          <div class="setup-progress"><div class="setup-step done"></div><div class="setup-step done"></div><div class="setup-step"></div></div>
+          <div class="setup-title">Tell us about you</div>
+          <div class="setup-sub">This helps AthleteIQ personalize your forecasts</div>
+
+          <span class="setup-field-label">Full name</span>
+          <div class="setup-input">Arthur S.</div>
+
+          <span class="setup-field-label">Sport</span>
+          <div class="setup-chip-row">
+            <div class="setup-chip sel">Track & field</div>
+            <div class="setup-chip">Swimming</div>
+            <div class="setup-chip">Cycling</div>
+            <div class="setup-chip">Running</div>
+          </div>
+
+          <span class="setup-field-label">Main goal</span>
+          <div class="setup-chip-row">
+            <div class="setup-chip sel">Avoid injury</div>
+            <div class="setup-chip">Improve performance</div>
+            <div class="setup-chip">Both</div>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Coach setup</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="topnav"><svg class="icon"><use href="#i-arrow-left"/></svg><span class="topnav-title">Set up your team</span></div>
+      <div class="screen-body">
+        <div class="setup">
+          <div class="setup-progress"><div class="setup-step done"></div><div class="setup-step done"></div><div class="setup-step"></div></div>
+          <div class="setup-title">Invite your athletes</div>
+          <div class="setup-sub">They'll get a code to link their account to your roster</div>
+
+          <span class="setup-field-label">Team / squad name</span>
+          <div class="setup-input">Colombo Track Club</div>
+
+          <span class="setup-field-label">Invite by</span>
+          <div class="setup-chip-row">
+            <div class="setup-chip sel">Email</div>
+            <div class="setup-chip">Share code</div>
+            <div class="setup-chip">QR code</div>
+          </div>
+
+          <div class="device-card">
+            <div class="device-left"><div class="device-icon"><svg class="icon"><use href="#i-mail"/></svg></div><div class="device-name">arthur.s@email.com</div></div>
+            <div class="connected-badge"><svg class="icon"><use href="#i-check"/></svg>Sent</div>
+          </div>
+          <div class="device-card">
+            <div class="device-left"><div class="device-icon"><svg class="icon"><use href="#i-mail"/></svg></div><div class="device-name">tharusha.m@email.com</div></div>
+            <div class="connected-badge"><svg class="icon"><use href="#i-check"/></svg>Sent</div>
+          </div>
+          <div class="add-area-btn"><svg class="icon"><use href="#i-plus"/></svg>Add another athlete</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="group-label">Coach experience</div>
+<div class="row">
+
+  <div class="col">
+    <div class="label">Coach dashboard (roster)</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="roster">
+          <div class="roster-title">Your team</div>
+          <div class="roster-sub">8 athletes · 2 need attention</div>
+          <div class="search-box"><svg class="icon"><use href="#i-search"/></svg><span>Search athletes</span></div>
+
+          <div class="athlete-row">
+            <div class="athlete-avatar">AS</div>
+            <div class="athlete-info"><div class="athlete-name">Arthur S.</div><div class="athlete-meta">Track & field</div></div>
+            <div class="risk-chip risk-high">High</div>
+          </div>
+          <div class="athlete-row">
+            <div class="athlete-avatar">TM</div>
+            <div class="athlete-info"><div class="athlete-name">Tharusha M.</div><div class="athlete-meta">Swimming</div></div>
+            <div class="risk-chip risk-med">Medium</div>
+          </div>
+          <div class="athlete-row">
+            <div class="athlete-avatar">SK</div>
+            <div class="athlete-info"><div class="athlete-name">Shenon K.</div><div class="athlete-meta">Distance running</div></div>
+            <div class="risk-chip risk-low">Low</div>
+          </div>
+          <div class="athlete-row">
+            <div class="athlete-avatar">YD</div>
+            <div class="athlete-info"><div class="athlete-name">Yasasi D.</div><div class="athlete-meta">Cycling</div></div>
+            <div class="risk-chip risk-low">Low</div>
+          </div>
+          <div class="athlete-row">
+            <div class="athlete-avatar">AS</div>
+            <div class="athlete-info"><div class="athlete-name">Amaya S.</div><div class="athlete-meta">Track & field</div></div>
+            <div class="risk-chip risk-low">Low</div>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab active"><svg class="icon"><use href="#i-grid"/></svg>Team</div>
+        <div class="tab"><svg class="icon"><use href="#i-bell"/></svg>Alerts</div>
+        <div class="tab"><svg class="icon"><use href="#i-chat"/></svg>Ask</div>
+        <div class="tab"><svg class="icon"><use href="#i-user"/></svg>Profile</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Priority queue</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="roster">
+          <div class="roster-title">Needs attention</div>
+          <div class="roster-sub">Sorted by risk, highest first</div>
+          <div class="priority-banner"><svg class="icon"><use href="#i-activity"/></svg>2 athletes crossed a risk threshold today</div>
+
+          <div class="priority-row">
+            <div class="priority-num">01</div>
+            <div class="athlete-avatar">AS</div>
+            <div class="athlete-info"><div class="athlete-name">Arthur S.</div><div class="priority-metric">ACWR 1.6 · sleep -1.4h</div></div>
+            <div class="risk-chip risk-high">High</div>
+          </div>
+          <div class="priority-row">
+            <div class="priority-num">02</div>
+            <div class="athlete-avatar">TM</div>
+            <div class="athlete-info"><div class="athlete-name">Tharusha M.</div><div class="priority-metric">ACWR 1.4 · fatigue 4/5</div></div>
+            <div class="risk-chip risk-med">Medium</div>
+          </div>
+          <div class="priority-row">
+            <div class="priority-num">03</div>
+            <div class="athlete-avatar">SK</div>
+            <div class="athlete-info"><div class="athlete-name">Shenon K.</div><div class="priority-metric">ACWR 1.1 · stable</div></div>
+            <div class="risk-chip risk-low">Low</div>
+          </div>
+          <div class="priority-row">
+            <div class="priority-num">04</div>
+            <div class="athlete-avatar">YD</div>
+            <div class="athlete-info"><div class="athlete-name">Yasasi D.</div><div class="priority-metric">ACWR 0.9 · stable</div></div>
+            <div class="risk-chip risk-low">Low</div>
+          </div>
+          <div class="priority-row">
+            <div class="priority-num">05</div>
+            <div class="athlete-avatar">AS</div>
+            <div class="athlete-info"><div class="athlete-name">Amaya S.</div><div class="priority-metric">ACWR 1.0 · stable</div></div>
+            <div class="risk-chip risk-low">Low</div>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab active"><svg class="icon"><use href="#i-grid"/></svg>Team</div>
+        <div class="tab"><svg class="icon"><use href="#i-bell"/></svg>Alerts</div>
+        <div class="tab"><svg class="icon"><use href="#i-chat"/></svg>Ask</div>
+        <div class="tab"><svg class="icon"><use href="#i-user"/></svg>Profile</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Athlete detail (coach view)</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="topnav"><svg class="icon"><use href="#i-arrow-left"/></svg><span class="topnav-title">Arthur S.</span></div>
+      <div class="screen-body">
+        <div class="dash">
+          <div class="data-banner"><svg class="icon"><use href="#i-alert"/></svg><div class="data-banner-text">Score based on <b>training load, sleep, fatigue</b> — HRV not available for this athlete (Tier 2 device)</div></div>
+          <div class="dash-eyebrow"><svg class="icon"><use href="#i-activity"/></svg>This week's readiness</div>
+          <div class="ring-wrap">
+            <svg width="80" height="80" viewBox="0 0 88 88">
+              <circle cx="44" cy="44" r="38" fill="none" stroke="#1C1F1D" stroke-width="8"/>
+              <circle cx="44" cy="44" r="38" fill="none" stroke="#FF6A4D" stroke-width="8" stroke-linecap="round" stroke-dasharray="238.7" stroke-dashoffset="88" transform="rotate(-90 44 44)"/>
+              <text x="44" y="41" text-anchor="middle" font-family="Space Grotesk" font-size="16" font-weight="700" fill="#FF6A4D">62</text>
+              <text x="44" y="53" text-anchor="middle" font-size="6" fill="#6E736F">risk score</text>
+            </svg>
+          </div>
+          <div class="stat-row">
+            <div class="stat"><div class="s-label">Performance</div><div class="s-val" style="color:#2FE6B8">Strong</div></div>
+            <div class="stat"><div class="s-label">Recovery</div><div class="s-val" style="color:#FF6A4D">Falling</div></div>
+          </div>
+          <div class="rec-box">
+            <div class="r-label">Recommendation</div>
+            <div class="r-text">Reduce volume 20%, add one rest day</div>
+            <div class="pill-row">
+              <div class="pill pill-approve"><svg class="icon"><use href="#i-check"/></svg>Approve</div>
+              <div class="pill pill-reject"><svg class="icon"><use href="#i-x"/></svg>Reject</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Performance forecast</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="topnav"><svg class="icon"><use href="#i-arrow-left"/></svg><span class="topnav-title">Performance forecast</span></div>
+      <div class="screen-body">
+        <div class="perf">
+          <div class="perf-hero">
+            <div class="perf-score">8.2</div>
+            <div class="perf-scale">out of 10</div>
+            <div class="perf-event">Saturday 5k time trial</div>
+          </div>
+          <div class="perf-drivers-title">What's driving this</div>
+          <div class="driver-row"><span>Training consistency</span><div class="driver-bar-bg"><div class="driver-bar" style="width:34px"></div></div></div>
+          <div class="driver-row"><span>Prior race performance</span><div class="driver-bar-bg"><div class="driver-bar" style="width:28px"></div></div></div>
+          <div class="driver-row"><span>Current fatigue level</span><div class="driver-bar-bg"><div class="driver-bar" style="width:14px; background:#FF6A4D"></div></div></div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Injury risk detail</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="topnav"><svg class="icon"><use href="#i-arrow-left"/></svg><span class="topnav-title">Injury risk</span></div>
+      <div class="screen-body">
+        <div class="risk">
+          <div class="acwr-box">
+            <div class="acwr-label">ACWR</div>
+            <div class="acwr-val">1.6</div>
+            <div class="acwr-bar-bg"><div class="acwr-zone-safe"></div><div class="acwr-marker"></div></div>
+            <div class="acwr-caption">Above the typical safe range of 0.8–1.3</div>
+          </div>
+          <div class="signal-row"><span>Resting heart rate</span><span class="signal-tag tag-up">+6 bpm</span></div>
+          <div class="signal-row"><span>Sleep vs baseline</span><span class="signal-tag tag-up">-1.4h</span></div>
+          <div class="signal-row"><span>Self-reported fatigue</span><span class="signal-tag tag-up">4 / 5</span></div>
+          <div class="signal-row"><span>HRV trend</span><span class="signal-tag tag-down">Stable</span></div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Why this call</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="topnav"><svg class="icon"><use href="#i-x"/></svg><span class="topnav-title">Why this call</span></div>
+      <div class="screen-body">
+        <div class="why">
+          <div class="why-sub">Risk prioritized over performance</div>
+          <div class="factor">
+            <div class="factor-top"><span class="factor-name">Training load spike</span><span class="factor-badge badge-high">High</span></div>
+            <div class="factor-desc">Load up 40% vs your 4-week average</div>
+          </div>
+          <div class="factor">
+            <div class="factor-top"><span class="factor-name">Sleep decline</span><span class="factor-badge badge-med">Medium</span></div>
+            <div class="factor-desc">Avg sleep down from 7.2h to 5.8h</div>
+          </div>
+          <div class="factor">
+            <div class="factor-top"><span class="factor-name">Resting heart rate</span><span class="factor-badge badge-med">Medium</span></div>
+            <div class="factor-desc">6 bpm above your normal baseline</div>
+          </div>
+          <div class="source-box">
+            <div class="source-label">Sports science note</div>
+            <div class="source-text">Backed by research on load spikes and injury risk</div>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Orchestrator decision</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="topnav"><svg class="icon"><use href="#i-brain"/></svg><span class="topnav-title">Conflicting signals</span></div>
+      <div class="screen-body">
+        <div class="conflict">
+          <div class="conflict-sub">Two models disagreed this week — here's how it was resolved</div>
+          <div class="conflict-pair">
+            <div class="conflict-card">
+              <div class="cc-label">Performance model</div>
+              <div class="cc-val">8.2 / 10</div>
+              <div class="cc-tag defer">Deferred</div>
+            </div>
+            <div class="conflict-card win">
+              <div class="cc-label">Risk model</div>
+              <div class="cc-val">High risk</div>
+              <div class="cc-tag wins">Took priority</div>
+            </div>
+          </div>
+          <div class="verdict-box">
+            <div class="verdict-label">Orchestrator rule</div>
+            <div class="verdict-text">When risk is elevated, protecting the athlete overrides a strong performance forecast — even a great predicted result isn't worth pushing through rising injury risk.</div>
+          </div>
+          <div class="rule-note">This rule is fixed by design and isn't adjusted case-by-case. Coaches can still override the resulting recommendation.</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Modify recommendation</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="topnav"><svg class="icon"><use href="#i-edit"/></svg><span class="topnav-title">Adjust plan</span></div>
+      <div class="screen-body">
+        <div class="mlog">
+          <div class="modify-current">AthleteIQ suggested: <b>Reduce volume 20%, add one rest day.</b> Edit below before sending to Arthur.</div>
+
+          <div class="mlog-field">
+            <span class="mlog-label">Volume reduction</span>
+            <div class="chip-row">
+              <div class="chip-opt">10%</div>
+              <div class="chip-opt sel">20%</div>
+              <div class="chip-opt">30%</div>
+            </div>
+          </div>
+
+          <div class="mlog-field">
+            <span class="mlog-label">Extra rest days</span>
+            <div class="chip-row">
+              <div class="chip-opt">0</div>
+              <div class="chip-opt sel">1</div>
+              <div class="chip-opt">2</div>
+            </div>
+          </div>
+
+          <div class="mlog-field">
+            <span class="mlog-label">Note to Arthur</span>
+            <div class="setup-input" style="height:32px; align-items:flex-start; padding-top:6px;">Take it easy this week, we'll reassess Sunday.</div>
+          </div>
+
+          <div class="modify-save-row">
+            <div class="modify-save"><svg class="icon"><use href="#i-check"/></svg>Send to athlete</div>
+            <div class="modify-cancel">Cancel</div>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Trends</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="trend">
+          <div class="trend-title">Workload ratio</div>
+          <div class="trend-sub">Last 6 weeks</div>
+          <div class="chart-box">
+            <svg viewBox="0 0 148 84" width="148" height="84">
+              <rect x="0" y="30" width="148" height="24" fill="#153A30" opacity="0.5"/>
+              <polyline points="4,44 30,48 56,54 82,36 108,20 144,8" fill="none" stroke="#FF6A4D" stroke-width="2.5"/>
+              <circle cx="4" cy="44" r="3" fill="#6E736F"/>
+              <circle cx="144" cy="8" r="3" fill="#FF6A4D"/>
+            </svg>
+          </div>
+          <div class="pattern">
+            <div class="pattern-label">Pattern detected</div>
+            <div class="pattern-text">Load climbing 3 weeks straight, no recovery week</div>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Weekly report</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="topnav"><svg class="icon"><use href="#i-arrow-left"/></svg><span class="topnav-title">Week in review</span></div>
+      <div class="screen-body">
+        <div class="report">
+          <div class="report-sub">Jul 20 – Jul 26</div>
+          <div class="report-summary"><div class="report-summary-text">Load spiked mid-week, coach reduced volume 20% on Thursday. Risk eased back to a safe range by Sunday.</div></div>
+          <div class="report-row"><span>Sessions completed</span><span class="r-num">5</span></div>
+          <div class="report-row"><span>Avg sleep</span><span class="r-num">6.4h</span></div>
+          <div class="report-row"><span>Peak ACWR</span><span class="r-num" style="color:#FF6A4D">1.6</span></div>
+          <div class="report-row"><span>Coach adjustments</span><span class="r-num">1</span></div>
+          <div class="export-btn"><svg class="icon"><use href="#i-download"/></svg>Export for coach</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Supporting research</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="topnav"><svg class="icon"><use href="#i-book"/></svg><span class="topnav-title">Backing this up</span></div>
+      <div class="screen-body">
+        <div class="research">
+          <div class="research-sub">Sports-science context the Knowledge Agent pulled in for Arthur's recommendation</div>
+
+          <div class="cite-card">
+            <div class="cite-tag">Workload spikes</div>
+            <div class="cite-text">Sharp week-to-week jumps in training load are consistently linked to higher injury rates in endurance athletes.</div>
+            <div class="cite-src">Gabbett, Br J Sports Med</div>
+          </div>
+          <div class="cite-card">
+            <div class="cite-tag">Sleep & recovery</div>
+            <div class="cite-text">Reduced sleep duration is associated with slower recovery and elevated perceived fatigue after hard training blocks.</div>
+            <div class="cite-src">Fullagar et al., Sports Medicine</div>
+          </div>
+          <div class="research-caveat">ACWR is a useful signal, not a perfect one — it's one input among several, not treated as absolute truth.</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Alerts</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="notif">
+          <div class="notif-title">Alerts</div>
+          <div class="notif-item">
+            <div class="notif-icon" style="color:#FF6A4D"><svg class="icon"><use href="#i-alert"/></svg></div>
+            <div><div class="notif-text">Arthur's injury risk rose to high — review the new recommendation</div><div class="notif-time">2h ago</div></div>
+          </div>
+          <div class="notif-item">
+            <div class="notif-icon" style="color:#2FE6B8"><svg class="icon"><use href="#i-check"/></svg></div>
+            <div><div class="notif-text">You approved a reduced training plan for Arthur</div><div class="notif-time">2h ago</div></div>
+          </div>
+          <div class="notif-item">
+            <div class="notif-icon" style="color:#E6A83B"><svg class="icon"><use href="#i-alert"/></svg></div>
+            <div><div class="notif-text">Maya's ACWR crossed 1.4 — worth a check-in</div><div class="notif-time">6h ago</div></div>
+          </div>
+          <div class="notif-item">
+            <div class="notif-icon" style="color:#8A8F8C"><svg class="icon"><use href="#i-doc"/></svg></div>
+            <div><div class="notif-text">Weekly report for Arthur is ready</div><div class="notif-time">1d ago</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab"><svg class="icon"><use href="#i-grid"/></svg>Team</div>
+        <div class="tab active"><svg class="icon"><use href="#i-bell"/></svg>Alerts</div>
+        <div class="tab"><svg class="icon"><use href="#i-chat"/></svg>Ask</div>
+        <div class="tab"><svg class="icon"><use href="#i-user"/></svg>Profile</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Ask AthleteIQ (coach)</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="chat">
+          <div class="bubble bubble-user">Which of my athletes are trending toward high risk this week?</div>
+          <div class="bubble bubble-ai">Arthur and Tharusha. Arthur's ACWR hit 1.6 with sleep down 1.4h — already high. Tharusha's ACWR is climbing toward 1.4 with fatigue at 4/5 — worth a check-in before it flips to high.</div>
+          <div class="bubble bubble-user">What changed for the whole team this week vs last?</div>
+          <div class="bubble bubble-ai">Average training load is up 18% across the roster with no shared recovery week — that's the pattern behind most of this week's alerts.</div>
+          <div class="chat-input"><span>Ask about your team…</span><svg class="icon"><use href="#i-send"/></svg></div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab"><svg class="icon"><use href="#i-grid"/></svg>Team</div>
+        <div class="tab"><svg class="icon"><use href="#i-bell"/></svg>Alerts</div>
+        <div class="tab active"><svg class="icon"><use href="#i-chat"/></svg>Ask</div>
+        <div class="tab"><svg class="icon"><use href="#i-user"/></svg>Profile</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Coach profile & settings</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="profile">
+          <div class="profile-head">
+            <div class="avatar">CJ</div>
+            <div><div class="profile-name">Coach Jenna</div><div class="profile-sub">Coach · Colombo Track Club · 8 athletes</div></div>
+          </div>
+          <div class="settings-row"><div class="settings-left"><svg class="icon"><use href="#i-users"/></svg>Manage roster</div><svg class="chev"><use href="#i-chevron"/></svg></div>
+          <div class="settings-row"><div class="settings-left"><svg class="icon"><use href="#i-plus"/></svg>Invite athlete</div><svg class="chev"><use href="#i-chevron"/></svg></div>
+          <div class="settings-row"><div class="settings-left"><svg class="icon"><use href="#i-bell"/></svg>Alert thresholds</div><svg class="chev"><use href="#i-chevron"/></svg></div>
+          <div class="settings-row"><div class="settings-left"><svg class="icon"><use href="#i-lock"/></svg>Data privacy</div><svg class="chev"><use href="#i-chevron"/></svg></div>
+          <div class="settings-row"><div class="settings-left"><svg class="icon"><use href="#i-moon"/></svg>Dark mode</div><div class="toggle"></div></div>
+          <div class="settings-row"><div class="settings-left"><svg class="icon"><use href="#i-logout"/></svg>Log out</div></div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab"><svg class="icon"><use href="#i-grid"/></svg>Team</div>
+        <div class="tab"><svg class="icon"><use href="#i-bell"/></svg>Alerts</div>
+        <div class="tab"><svg class="icon"><use href="#i-chat"/></svg>Ask</div>
+        <div class="tab active"><svg class="icon"><use href="#i-user"/></svg>Profile</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="group-label">Athlete experience</div>
+<div class="row">
+
+  <div class="col">
+    <div class="label">Athlete dashboard (home)</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="status">
+          <div class="status-hero">
+            <div class="s-eyebrow">Today</div>
+            <div class="s-head">Take it a bit easier this week</div>
+            <div class="s-sub">Your coach approved a lighter day and one extra rest day, based on your training load and sleep.</div>
+          </div>
+          <div class="plan-title">This week</div>
+          <div class="plan-row"><span><span class="dot dot-rest"></span>Mon</span><span class="muted">Rest</span></div>
+          <div class="plan-row"><span><span class="dot dot-active"></span>Tue</span><span>Light run</span></div>
+          <div class="plan-row"><span><span class="dot dot-rest"></span>Wed</span><span class="muted">Rest</span></div>
+          <div class="plan-row"><span><span class="dot dot-active"></span>Thu</span><span>Normal</span></div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab active"><svg class="icon"><use href="#i-grid"/></svg>Home</div>
+        <div class="tab"><svg class="icon"><use href="#i-chart"/></svg>Trends</div>
+        <div class="tab"><svg class="icon"><use href="#i-chat"/></svg>Ask</div>
+        <div class="tab"><svg class="icon"><use href="#i-user"/></svg>Profile</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Manual daily log</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="topnav"><svg class="icon"><use href="#i-arrow-left"/></svg><span class="topnav-title">Log today</span></div>
+      <div class="screen-body">
+        <div class="mlog">
+          <div class="mlog-sub">No device connected — enter today's training by hand</div>
+
+          <div class="mlog-field">
+            <span class="mlog-label">Did you train today?</span>
+            <div class="chip-row">
+              <div class="chip-opt sel">Yes</div>
+              <div class="chip-opt">Rest day</div>
+            </div>
+          </div>
+
+          <div class="mlog-field">
+            <span class="mlog-label">Session duration</span>
+            <div class="chip-row">
+              <div class="chip-opt">30 min</div>
+              <div class="chip-opt sel">60 min</div>
+              <div class="chip-opt">90+ min</div>
+            </div>
+          </div>
+
+          <div class="mlog-field">
+            <span class="mlog-label">How hard did it feel? (RPE)</span>
+            <div class="slider-track"><div class="slider-fill"></div><div class="slider-dot"></div></div>
+            <div class="slider-scale"><span>Easy</span><span>Moderate</span><span>Max effort</span></div>
+          </div>
+
+          <div class="mlog-field">
+            <span class="mlog-label">Hours of sleep last night</span>
+            <div class="slider-track"><div class="slider-fill" style="width:45%"></div><div class="slider-dot" style="left:45%"></div></div>
+            <div class="slider-scale"><span>4h</span><span>7h</span><span>10h</span></div>
+          </div>
+
+          <div class="mlog-field">
+            <span class="mlog-label">Fatigue today</span>
+            <div class="chip-row">
+              <div class="chip-opt">1</div>
+              <div class="chip-opt">2</div>
+              <div class="chip-opt sel">3</div>
+              <div class="chip-opt">4</div>
+              <div class="chip-opt">5</div>
+            </div>
+          </div>
+
+          <div class="mlog-save"><svg class="icon"><use href="#i-check"/></svg>Save today's log</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Report pain</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="topnav"><svg class="icon"><use href="#i-arrow-left"/></svg><span class="topnav-title">Report pain</span></div>
+      <div class="screen-body">
+        <div class="pain">
+          <div class="pain-sub">Flag anything that hurts — separate from general fatigue</div>
+
+          <div class="body-row">
+            <div class="body-left"><svg class="icon"><use href="#i-bodypin"/></svg>Left knee</div>
+            <div class="severity-dots"><div class="sev-dot on"></div><div class="sev-dot on"></div><div class="sev-dot on"></div><div class="sev-dot"></div><div class="sev-dot"></div></div>
+          </div>
+          <div class="body-row">
+            <div class="body-left"><svg class="icon"><use href="#i-bodypin"/></svg>Right ankle</div>
+            <div class="severity-dots"><div class="sev-dot on"></div><div class="sev-dot"></div><div class="sev-dot"></div><div class="sev-dot"></div><div class="sev-dot"></div></div>
+          </div>
+          <div class="add-area-btn"><svg class="icon"><use href="#i-plus"/></svg>Add another area</div>
+
+          <div class="pain-note">Your coach and AthleteIQ will factor this into your risk score. Significant pain should also be checked by a medical professional.</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Training calendar</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="cal">
+          <div class="cal-title">July 2026</div>
+          <div class="cal-grid">
+            <div class="cal-dow">S</div><div class="cal-dow">M</div><div class="cal-dow">T</div><div class="cal-dow">W</div><div class="cal-dow">T</div><div class="cal-dow">F</div><div class="cal-dow">S</div>
+            <div class="cal-day done">21</div><div class="cal-day rest">22</div><div class="cal-day done">23</div><div class="cal-day rest">24</div><div class="cal-day done">25</div><div class="cal-day done">26</div><div class="cal-day rest">27</div>
+            <div class="cal-day today">28</div><div class="cal-day">29</div><div class="cal-day rest">30</div><div class="cal-day">31</div><div class="cal-day">1</div><div class="cal-day rest">2</div><div class="cal-day">3</div>
+          </div>
+          <div class="cal-legend">
+            <span><div class="legend-dot" style="background:#153A30"></div>Trained</span>
+            <span><div class="legend-dot" style="background:#17191A"></div>Rest</span>
+            <span><div class="legend-dot" style="background:#121412; border:1px solid #2FE6B8"></div>Today</span>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab"><svg class="icon"><use href="#i-grid"/></svg>Home</div>
+        <div class="tab active"><svg class="icon"><use href="#i-chart"/></svg>Trends</div>
+        <div class="tab"><svg class="icon"><use href="#i-chat"/></svg>Ask</div>
+        <div class="tab"><svg class="icon"><use href="#i-user"/></svg>Profile</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">My performance</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="aperf">
+          <div class="aperf-hero">
+            <div class="aperf-icon"><svg class="icon"><use href="#i-target"/></svg></div>
+            <div class="aperf-head">You're on track for a strong race Saturday</div>
+            <div class="aperf-sub">Based on your training consistency and past results, not just this week alone.</div>
+          </div>
+          <div class="aperf-tip-title">Tips to stay on track</div>
+          <div class="aperf-tip">Keep tomorrow's session light — you're still recovering from Tuesday's load.</div>
+          <div class="aperf-tip">Prioritize sleep the next 2 nights before race day.</div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab active"><svg class="icon"><use href="#i-grid"/></svg>Home</div>
+        <div class="tab"><svg class="icon"><use href="#i-chart"/></svg>Trends</div>
+        <div class="tab"><svg class="icon"><use href="#i-chat"/></svg>Ask</div>
+        <div class="tab"><svg class="icon"><use href="#i-user"/></svg>Profile</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Message coach</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="msg">
+          <div class="msg-head">
+            <div class="msg-avatar">CJ</div>
+            <div><div class="msg-name">Coach Jenna</div><div class="msg-role">Your coach</div></div>
+          </div>
+          <div class="bubble bubble-ai">Saw your log — take it easy on tomorrow's session, I already adjusted your plan.</div>
+          <div class="bubble bubble-user">Got it, thank you!</div>
+          <div class="bubble bubble-ai">Also check in if that knee is still bothering you after the light run.</div>
+          <div class="msg-input"><span>Message your coach…</span><svg class="icon"><use href="#i-send"/></svg></div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab"><svg class="icon"><use href="#i-grid"/></svg>Home</div>
+        <div class="tab"><svg class="icon"><use href="#i-chart"/></svg>Trends</div>
+        <div class="tab active"><svg class="icon"><use href="#i-msg"/></svg>Coach</div>
+        <div class="tab"><svg class="icon"><use href="#i-user"/></svg>Profile</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">My alerts</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="notif">
+          <div class="notif-title">Alerts</div>
+          <div class="notif-item">
+            <div class="notif-icon" style="color:#2FE6B8"><svg class="icon"><use href="#i-check"/></svg></div>
+            <div><div class="notif-text">Your coach approved a lighter training day this week</div><div class="notif-time">2h ago</div></div>
+          </div>
+          <div class="notif-item">
+            <div class="notif-icon" style="color:#E6A83B"><svg class="icon"><use href="#i-bell"/></svg></div>
+            <div><div class="notif-text">Don't forget to log today's training</div><div class="notif-time">5h ago</div></div>
+          </div>
+          <div class="notif-item">
+            <div class="notif-icon" style="color:#8A8F8C"><svg class="icon"><use href="#i-msg"/></svg></div>
+            <div><div class="notif-text">New message from Coach Jenna</div><div class="notif-time">2h ago</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Ask AthleteIQ</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="chat">
+          <div class="bubble bubble-user">Why am I fatigued this week?</div>
+          <div class="bubble bubble-ai">Training load rose 40% over 5 days and sleep dropped from 7.2 to 5.8 hours. That combo is why risk went up.</div>
+          <div class="bubble bubble-user">Should I train tomorrow?</div>
+          <div class="bubble bubble-ai">Your coach approved a light session, not a rest day. Keep it easy.</div>
+          <div class="chat-input"><span>Ask a question…</span><svg class="icon"><use href="#i-send"/></svg></div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab"><svg class="icon"><use href="#i-grid"/></svg>Home</div>
+        <div class="tab"><svg class="icon"><use href="#i-chart"/></svg>Trends</div>
+        <div class="tab active"><svg class="icon"><use href="#i-chat"/></svg>Ask</div>
+        <div class="tab"><svg class="icon"><use href="#i-user"/></svg>Profile</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Profile & settings</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="profile">
+          <div class="profile-head">
+            <div class="avatar">AS</div>
+            <div><div class="profile-name">Arthur S.</div><div class="profile-sub">Athlete · Track & field</div></div>
+          </div>
+          <div class="settings-row"><div class="settings-left"><svg class="icon"><use href="#i-watch"/></svg>Connected devices</div><svg class="chev"><use href="#i-chevron"/></svg></div>
+          <div class="settings-row"><div class="settings-left"><svg class="icon"><use href="#i-bell"/></svg>Notifications</div><div class="toggle"></div></div>
+          <div class="settings-row"><div class="settings-left"><svg class="icon"><use href="#i-lock"/></svg>Data privacy</div><svg class="chev"><use href="#i-chevron"/></svg></div>
+          <div class="settings-row"><div class="settings-left"><svg class="icon"><use href="#i-users"/></svg>Coach access</div><div class="toggle"></div></div>
+          <div class="settings-row"><div class="settings-left"><svg class="icon"><use href="#i-moon"/></svg>Dark mode</div><div class="toggle"></div></div>
+          <div class="settings-row"><div class="settings-left"><svg class="icon"><use href="#i-logout"/></svg>Log out</div></div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab"><svg class="icon"><use href="#i-grid"/></svg>Home</div>
+        <div class="tab"><svg class="icon"><use href="#i-chart"/></svg>Trends</div>
+        <div class="tab"><svg class="icon"><use href="#i-chat"/></svg>Ask</div>
+        <div class="tab active"><svg class="icon"><use href="#i-user"/></svg>Profile</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Data sharing</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="topnav"><svg class="icon"><use href="#i-arrow-left"/></svg><span class="topnav-title">What Coach Jenna sees</span></div>
+      <div class="screen-body">
+        <div class="consent">
+          <div class="consent-sub">You control what's shared. Turning something off may limit how accurate your recommendations are.</div>
+
+          <div class="consent-row">
+            <div><div class="consent-name">Wearable data</div><div class="consent-desc">Heart rate, sleep, HRV</div></div>
+            <div class="toggle"></div>
+          </div>
+          <div class="consent-row">
+            <div><div class="consent-name">Training logs</div><div class="consent-desc">Sessions, duration, intensity</div></div>
+            <div class="toggle"></div>
+          </div>
+          <div class="consent-row">
+            <div><div class="consent-name">Injury history</div><div class="consent-desc">Past and current injuries</div></div>
+            <div class="toggle"></div>
+          </div>
+          <div class="consent-row">
+            <div><div class="consent-name">Daily fatigue check-in</div><div class="consent-desc">Your 1–5 self-report</div></div>
+            <div class="toggle"></div>
+          </div>
+          <div class="consent-row">
+            <div><div class="consent-name">Chat with AthleteIQ</div><div class="consent-desc">Questions you've asked the assistant</div></div>
+            <div class="toggle off"></div>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="group-label">Edge cases & states</div>
+<div class="row">
+
+  <div class="col">
+    <div class="label">No data yet</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="empty-wrap">
+          <div class="empty-icon"><svg class="icon"><use href="#i-activity"/></svg></div>
+          <div class="empty-title">Building your first forecast</div>
+          <div class="empty-text">Sync a few more days of training and sleep data before AthleteIQ can predict performance or risk reliably.</div>
+          <div class="empty-btn">Log today manually</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Sync failed</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="screen-body">
+        <div class="empty-wrap">
+          <div class="empty-icon warn"><svg class="icon"><use href="#i-watch"/></svg></div>
+          <div class="empty-title">Garmin sync interrupted</div>
+          <div class="empty-text">We haven't received new data since Tuesday. Your risk score may be based on outdated numbers until this reconnects.</div>
+          <div class="empty-btn">Reconnect device</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">Not enough data (coach view)</div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="topnav"><svg class="icon"><use href="#i-arrow-left"/></svg><span class="topnav-title">New athlete</span></div>
+      <div class="screen-body">
+        <div class="empty-wrap">
+          <div class="empty-icon"><svg class="icon"><use href="#i-user"/></svg></div>
+          <div class="empty-title">No forecast for this athlete yet</div>
+          <div class="empty-text">This athlete joined 2 days ago. AthleteIQ needs about 5 days of training history before scoring risk or performance.</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -10,10 +10,18 @@ build/
 # Firebase
 functions/lib/
 functions/node_modules/
+**/node_modules/
+functions/.env
+functions/.env.local
+functions/.secret.local
 .firebase/
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+
+# Secrets — never commit service account keys
+MODEL/athleteiq-risk-engine/serviceAccountKey.json
+*.json.key
 
 # IDE
 .idea/
@@ -23,3 +31,6 @@ ui-debug.log
 # Do NOT commit real Firebase secrets/config if you make this repo public
 # lib/firebase_options.dart is usually fine to commit (it's not a secret,
 # just client IDs) — but check your own comfort level.
+
+# Archived FastAPI backend (rollback copy — not part of active development)
+backend_archive/

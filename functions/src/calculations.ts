@@ -10,11 +10,13 @@
 
 export interface DailyEntry {
   date: string; // yyyy-mm-dd
-  trainingLoad: number | null; // null on rest/no-session days
+  trainingLoad: number | null; // 0 on rest days; null coerced to 0 in sumLoad()
   sleepHours: number | null;
   restingHeartRate: number | null;
   hrv: number | null;
   fatigueScore: number; // 1-5, always present (daily check-in is required)
+  sessionSport?: string | null;
+  sessionSportGroup?: string | null;
 }
 
 /** Sum of training load over the most recent N days (inclusive of today). */
@@ -28,6 +30,10 @@ export function sumLoad(entries: DailyEntry[], days: number): number {
  * weekly load over the last 4 weeks). Gabbett (2016) sweet spot:
  * 0.8–1.3 low, >1.5 danger zone (Section 18.1 / 18.2 — cited with the
  * caveat that this figure has been contested in the literature).
+ *
+ * Section 18.4 — these ACWR cutoffs are fixed constants. They are NOT
+ * loaded from coaches/{uid}/teamSettings (only recommendation load-reduction
+ * wording percentages are coach-adjustable there).
  */
 export function calculateACWR(entries: DailyEntry[]): { acwr: number; acute7: number; chronicAvgWeekly: number } {
   const acute7 = sumLoad(entries, 7);

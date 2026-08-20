@@ -1,0 +1,12 @@
+# Render "Blueprint" file — lets you deploy by connecting your repo and
+# clicking "New +" -> "Blueprint" instead of configuring each field by hand.
+services:
+  - type: web
+    name: athleteiq-risk-engine
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false   # you paste this manually in the Render dashboard, never in git

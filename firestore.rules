@@ -17,50 +17,215 @@ service cloud.firestore {
 
     function isCoachOf(athleteUid) {
       return isSignedIn() &&
-        get(/databases/$(database)/documents/athletes/$(athleteUid)).data.coachUid == request.auth.uid;
+        athleteData(athleteUid).coachUid == request.auth.uid;
+    }
+
+    function athleteData(athleteUid) {
+      return get(/databases/$(database)/documents/athletes/$(athleteUid)).data;
+    }
+
+    // Missing privacySettings (or a missing key) means shared. Opt-out is explicit false.
+    function privacyShared(athleteUid, key) {
+      return athleteData(athleteUid).get('privacySettings', {}).get(key, true) != false;
+    }
+
+    // Section 6 / 11 — Human Approval Step. pending/rejected stay coach-only.
+    function recommendationReleased(data) {
+      return data.get('recommendationStatus', 'pending') in ['approved', 'modified'];
     }
 
     // users/{uid} — role lookup only. A user can read/write their own doc;
     // role is set once at signup and shouldn't be client-editable after.
+    // fcmToken is written by the signed-in client after permission grant.
     match /users/{uid} {
       allow read: if isSelf(uid);
       allow create: if isSelf(uid);
       allow update: if isSelf(uid) && request.resource.data.role == resource.data.role;
     }
 
+    // coaches/{uid} — invite code lookup for athletes joining a roster.
+    match /coaches/{coachUid} {
+      allow read: if isSignedIn();
+      allow create: if isSelf(coachUid);
+      allow update: if isSelf(coachUid);
+
+      match /alerts/{alertId} {
+        // HIGH pain triage and other coach-facing flags. Admin SDK writes only.
+        allow read: if isSelf(coachUid);
+        allow write: if false;
+      }
+
+      match /teamSettings/{docId} {
+        // Section 18.4 — coach-adjustable recommendation wording + profile prefs.
+        allow read: if isSelf(coachUid);
+        allow create, update: if isSelf(coachUid) && validTeamSettings(request.resource.data);
+        allow delete: if false;
+      }
+
+      match /inboxRead/{athleteUid} {
+        // Per-thread last-read for the coach inbox.
+        allow read, create, update: if isSelf(coachUid);
+        allow delete: if false;
+      }
+    }
+
+    function validTeamSettings(data) {
+      return (!data.keys().hasAny(['defaultActionPercent']) ||
+          (data.defaultActionPercent is int &&
+           data.defaultActionPercent >= 10 &&
+           data.defaultActionPercent <= 30)) &&
+        (!data.keys().hasAny(['teamName']) || data.teamName is string) &&
+        (!data.keys().hasAny(['notificationsEnabled']) || data.notificationsEnabled is bool) &&
+        (!data.keys().hasAny(['notifyRiskSpikes']) || data.notifyRiskSpikes is bool) &&
+        (!data.keys().hasAny(['notifyMissedCheckIns']) || data.notifyMissedCheckIns is bool) &&
+        (!data.keys().hasAny(['notifyHighPain']) || data.notifyHighPain is bool);
+    }
+
+    // Fields the athlete client may write on create / update.
+    // Server-only (Admin SDK): latestPainUrgency, latestPainAt,
+    // latestPainSummary, latestPainReportId — written by submitPainReport.
+    function athleteClientProfileKeys() {
+      return [
+        'name',
+        'email',
+        'sport',
+        'sports',
+        'sportGroup',
+        'sportGroups',
+        'sportClassificationConfidence',
+        'sportClassificationSource',
+        'deviceTier',
+        'activeDevice',
+        'deviceSetupCompleted',
+        'privacySettings',
+        'coachUid',
+        'createdAt'
+      ];
+    }
+
+    function athleteClientUpdateKeys() {
+      return [
+        'name',
+        'email',
+        'sport',
+        'sports',
+        'sportGroup',
+        'sportGroups',
+        'sportClassificationConfidence',
+        'sportClassificationSource',
+        'deviceTier',
+        'activeDevice',
+        'deviceSetupCompleted',
+        'privacySettings',
+        'coachUid'
+      ];
+    }
+
+    // Link once (null/missing → string), disconnect (string → null), or
+    // leave coachUid unchanged while editing other client-owned fields.
+    function validCoachUidTransition() {
+      return request.resource.data.coachUid == resource.data.get('coachUid', null) ||
+        (resource.data.get('coachUid', null) == null &&
+          request.resource.data.coachUid is string) ||
+        (resource.data.get('coachUid', null) != null &&
+          request.resource.data.coachUid == null);
+    }
+
     match /athletes/{athleteUid} {
       // Section 17.1 — coach sees full evidence, athlete sees their own.
-      allow read: if isSelf(athleteUid) || isCoachOf(athleteUid);
-      allow create: if isSelf(athleteUid);
-      // Athlete can edit their own profile (sport, device tier) but never
-      // reassign their own coach — that's an invite/admin flow, not here.
+      // Roster queries use .where('coachUid', isEqualTo: coachUid) — must
+      // use resource.data here, not get(), or the list query is rejected.
+      allow read: if isSelf(athleteUid) ||
+        (isSignedIn() && resource.data.get('coachUid', null) == request.auth.uid);
+      allow create: if isSelf(athleteUid) &&
+        request.resource.data.keys().hasOnly(athleteClientProfileKeys());
       allow update: if isSelf(athleteUid) &&
-        request.resource.data.coachUid == resource.data.coachUid;
+        validCoachUidTransition() &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(athleteClientUpdateKeys());
 
       match /checkins/{checkinId} {
-        // Only the athlete logs their own data — never the coach, and
-        // never another athlete.
-        allow read: if isSelf(athleteUid) || isCoachOf(athleteUid);
-        allow write: if isSelf(athleteUid);
+        // Mixed document (load + sleep + HRV + fatigue). Firestore cannot
+        // hide individual fields, so the raw doc is athlete-only. Coaches
+        // read the Cloud Function-filtered checkinsCoachView instead.
+        allow read, write: if isSelf(athleteUid);
+      }
+
+      match /checkinsCoachView/{checkinId} {
+        // Privacy-filtered copy. Admin SDK writes only (onCheckInWritten /
+        // onAthletePrivacyUpdated). Withheld keys are omitted, not redacted
+        // in the client.
+        allow read: if isCoachOf(athleteUid);
+        allow write: if false;
       }
 
       match /riskResults/{docId} {
         // Written only by the Cloud Function (admin SDK bypasses rules).
-        // MVP note: both coach and athlete can read this doc so the app
-        // doesn't crash on a permission error — the Flutter UI is what
-        // hides the recommendation from the athlete until
-        // recommendationStatus == 'approved' (see AthleteHomeScreen).
-        // Section 17.3's stricter guarantee — the athlete truly cannot
-        // read the raw pending score at the database level — needs a
-        // second, sanitized "athleteView" doc written post-approval.
-        // That split is a good Phase 2 hardening step; call it out in
-        // the guide rather than building it into the MVP.
-        allow read: if isSelf(athleteUid) || isCoachOf(athleteUid);
+        // `latest` is coach-always; athlete only after approved|modified.
+        // Pending athletes read `athleteView` (scores, no recommendation).
+        // Dated snapshots have no recommendation and stay readable.
+        allow read: if isCoachOf(athleteUid) ||
+          (isSelf(athleteUid) && (
+            docId == 'athleteView' ||
+            (docId == 'latest' && recommendationReleased(resource.data)) ||
+            (docId != 'latest' && docId != 'athleteView')
+          ));
         // Only the coach may change recommendationStatus (Section 6 / 11
         // — Human Approval Step, sole approval authority).
         allow update: if isCoachOf(athleteUid) &&
+          docId == 'latest' &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['recommendationStatus', 'recommendation', 'reviewedAt']);
+      }
+
+      match /devices/{deviceId} {
+        // Raw HealthKit / Health Connect snapshots. Coach only if wearable sharing is on.
+        allow read: if isSelf(athleteUid) ||
+          (isCoachOf(athleteUid) && privacyShared(athleteUid, 'wearableData'));
+        allow write: if isSelf(athleteUid);
+      }
+
+      match /aiChat/{messageId} {
+        // Ask AthleteIQ history at athletes/{uid}/aiChat/{messageId}.
+        // Clients: athlete read/write (Flutter fallback); coach read-only.
+        // askAthleteIQ Cloud Function writes both messages via Admin SDK.
+        allow read: if isSelf(athleteUid) || isCoachOf(athleteUid);
+        allow write: if isSelf(athleteUid);
+      }
+
+      match /messages/{messageId} {
+        // Coach chat — two-way conversation between athlete and assigned coach.
+        allow read, write: if isSelf(athleteUid) || isCoachOf(athleteUid);
+      }
+
+      match /painReports/{reportId} {
+        // Written only by submitPainReport (Admin SDK). Direct client
+        // creates would skip LLM triage and the HIGH-urgency coach alert.
+        // Coach reads are gated on injuryHistory sharing.
+        allow read: if isSelf(athleteUid) ||
+          (isCoachOf(athleteUid) && privacyShared(athleteUid, 'injuryHistory'));
+        allow create, update, delete: if false;
+      }
+
+      match /alerts/{alertId} {
+        // Priority Fix #2 — written by Cloud Functions (admin SDK).
+        // Clients (athlete + assigned coach) read only; no client writes.
+        allow read: if isSelf(athleteUid) || isCoachOf(athleteUid);
+        allow write: if false;
+      }
+
+      match /orchestratorTraces/{traceId} {
+        // LangChain Orchestrator reasoning log. Admin SDK writes only.
+        allow read: if isSelf(athleteUid) || isCoachOf(athleteUid);
+        allow write: if false;
+      }
+
+      match /weeklyReports/{weekId} {
+        // Cached week-in-review includes sleep/fatigue/load. Coaches read
+        // a redacted copy via the getWeeklyReport callable (Admin SDK),
+        // not this collection — mixed fields cannot be stripped in rules.
+        allow read: if isSelf(athleteUid);
+        allow write: if false;
       }
     }
   }

@@ -10,10 +10,15 @@ class CheckIn {
   final int? rpe; // 1-10, manual only
   final int fatigueScore; // 1-5, manual only, required daily
   final double? sleepHours; // manual or synced
-  final double? restingHeartRate; // synced only (Tier 1/2)
-  final double? hrv; // synced only, Tier 1 only
+  final double? restingHeartRate; // wearable (Tier 1/2) or optional manual (Tier 3)
+  final double? hrv; // synced only, Tier 1 — never entered by hand
   final String? soreness; // free text, optional (roadmap: structured)
-  final String source; // 'manual' | 'wearable'
+  final String source; // 'manual' | 'wearable' | 'import'
+  /// Which of the athlete's sports this session was for (multi-sport).
+  final String? sessionSport;
+  final String? sessionSportGroup;
+  /// Optional daily step count (Tier 3 manual or Tier 2 device sync).
+  final int? steps;
 
   CheckIn({
     required this.id,
@@ -26,13 +31,16 @@ class CheckIn {
     this.hrv,
     this.soreness,
     this.source = 'manual',
+    this.sessionSport,
+    this.sessionSportGroup,
+    this.steps,
   });
 
-  /// Session-RPE training load for this entry. Null if no session logged
-  /// that day (a rest day still gets a fatigue check-in, but no load).
+  /// Session-RPE training load for this entry. Rest days store duration/RPE
+  /// as 0, so load is 0 (no training). Legacy null fields also mean no load.
   double? get trainingLoad {
     if (sessionDurationMinutes == null || rpe == null) return null;
-    return sessionDurationMinutes! * rpe!;
+    return (sessionDurationMinutes! * rpe!).toDouble();
   }
 
   Map<String, dynamic> toMap() => {
@@ -41,10 +49,13 @@ class CheckIn {
         'rpe': rpe,
         'fatigueScore': fatigueScore,
         'sleepHours': sleepHours,
-        'restingHeartRate': restingHeartRate,
-        'hrv': hrv,
+        if (restingHeartRate != null) 'restingHeartRate': restingHeartRate,
+        if (hrv != null) 'hrv': hrv,
         'soreness': soreness,
         'source': source,
+        if (sessionSport != null) 'sessionSport': sessionSport,
+        if (sessionSportGroup != null) 'sessionSportGroup': sessionSportGroup,
+        if (steps != null) 'steps': steps,
       };
 
   factory CheckIn.fromMap(String id, Map<String, dynamic> map) => CheckIn(
@@ -58,5 +69,8 @@ class CheckIn {
         hrv: (map['hrv'] as num?)?.toDouble(),
         soreness: map['soreness'],
         source: map['source'] ?? 'manual',
+        sessionSport: map['sessionSport'] as String?,
+        sessionSportGroup: map['sessionSportGroup'] as String?,
+        steps: (map['steps'] as num?)?.toInt(),
       );
 }

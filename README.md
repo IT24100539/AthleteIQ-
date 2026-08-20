@@ -3,6 +3,9 @@
 A coach-approved training load / injury-risk assistant. See the full
 build guide (`AthleteIQ_Build_Guide.md`) for step-by-step setup.
 
+> **Note:** This project uses `lib/` at the repo root and `functions/` as the
+> single backend — see [`docs/repo_structure.md`](docs/repo_structure.md).
+
 ## Structure
 
 - `lib/` — Flutter app (athlete + coach journeys)
@@ -12,25 +15,36 @@ build guide (`AthleteIQ_Build_Guide.md`) for step-by-step setup.
 - `firestore.rules` — coach/athlete permission boundaries
 - `firebase.json`, `firestore.indexes.json` — Firebase project config
 
-## What's implemented (v1 / MVP)
+## What's implemented (v0.2)
 
 - Email/password auth with coach or athlete role
 - Sport selection (Section 12.2's grouped list)
 - Manual daily check-in (RPE, fatigue, sleep, soreness notes) — works
   with zero wearable hardware (Tier 3, Section 9)
+- **Wearable sync** — Apple Health (iOS) and Health Connect (Android) for
+  Tier 1/2; manual entry for Tier 3. Syncs on app open/resume.
 - Server-side calculation of Training Load, ACWR, Fitness-Fatigue,
   and a rule-based risk classification (Section 13.4)
 - Sport-specific, orchestrated recommendation (risk always outranks
   performance — Section 6)
 - Coach roster, dashboard, approve / reject / modify flow
   (Human Approval Step — Section 6 / 11)
+- **Ask AthleteIQ** — natural-language Q&A grounded in the athlete's last
+  14 days of check-ins and latest risk result (`askAthleteIQ` callable;
+  Claude via `ANTHROPIC_API_KEY`)
+- **Knowledge Agent** — RAG-backed research notes written onto
+  `riskResults/latest` during the risk pipeline; coach Supporting Research
+  screen shows live output when present, otherwise Section 18.1 baseline
+  citations
+- Pain reports with LLM urgency triage, coach–athlete messaging, privacy
+  settings, account deletion, and weekly reports
 
-## What's intentionally NOT built yet (see guide's Roadmap section)
+## Not built yet (see guide's Roadmap section)
 
-- Wearable device sync (Garmin/Whoop/Apple Health APIs)
+- Garmin / Whoop integrations (requires vendor API approval)
 - Trained ML classifiers (Section 14.6) — v1 uses transparent rules,
   which the doc itself says is the correct starting point
-- Knowledge Agent (pulling live sports-science research)
-- Natural-language Q&A ("why am I tired this week?")
-- Coach-override learning, graded recommendation options, competition
-  calendar awareness
+- Coach-override learning, competition calendar awareness
+- Full store release (privacy policy hosting, Play/App Store listings, iOS
+  signing)
+# AthleteIQ-
