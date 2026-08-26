@@ -15,11 +15,23 @@ import { parsePrivacySettings } from './privacySettings';
 import { evaluateNightlyAlerts, NightlyAlertStats } from './nightlyAlerts';
 import { deleteAccountForUid } from './deleteAccount';
 import {
+  applyHumanReview,
+  evaluateAthleteHistory,
+  evaluateStoredOutput,
+  parseKinds,
+} from './evaluation/evaluate';
+import { isPromptKind } from './evaluation/rubric';
+import {
   privacySettingsChanged,
   resyncAllCheckInCoachViews,
   writeAthleteRiskView,
   writeCheckInCoachView,
 } from './privacyViews';
+import { athleteAccessDecision } from './athleteAccess';
+import {
+  notifyAthleteRecommendationReleased,
+  shouldNotifyRecommendationRelease,
+} from './recommendationNotify';
 
 initializeApp();
 const db = getFirestore();
@@ -46,12 +58,15 @@ async function requireAthleteOrCoach(
     throw new HttpsError('not-found', 'Athlete profile not found.');
   }
   const athleteData = athleteDoc.data()!;
-  const isSelf = request.auth.uid === athleteUid;
-  const isCoach = request.auth.uid === athleteData.coachUid;
-  if (!isSelf && !isCoach) {
+  const decision = athleteAccessDecision({
+    callerUid: request.auth.uid,
+    athleteUid,
+    coachUid: typeof athleteData.coachUid === 'string' ? athleteData.coachUid : null,
+  });
+  if (decision === 'denied') {
     throw new HttpsError('permission-denied', 'Not authorized for this athlete.');
   }
-  return { athleteUid, isCoach };
+  return { athleteUid, isCoach: decision === 'coach' };
 }
 
 /** Athlete onboarding — only the signed-in athlete may classify their sport. */
@@ -133,9 +148,7 @@ export const nightlyRecalculateRisk = onSchedule(
             ? (latestSnap.data()!.riskLevel as string)
             : null;
 
-        const result = await runRiskPipeline(doc.id, {
-          resetRecommendationStatus: false,
-        });
+        const result = await runRiskPipeline(doc.id);
         // Backfill checkinsCoachView for rosters that predate the
         // filtered-view triggers (fail-closed until this runs).
         await resyncAllCheckInCoachViews(doc.id);
@@ -369,11 +382,21 @@ export const submitPainReport = onCall(
 export const onRiskLatestWritten = onDocumentWritten(
   'athletes/{athleteUid}/riskResults/latest',
   async (event) => {
+    const before = event.data?.before;
     const after = event.data?.after;
-    await writeAthleteRiskView(
-      event.params.athleteUid,
-      after?.exists ? after.data() : undefined,
-    );
+    const afterData = after?.exists ? after.data() : undefined;
+    await writeAthleteRiskView(event.params.athleteUid, afterData);
+
+    const beforeData = before?.exists ? before.data() : undefined;
+    if (
+      afterData &&
+      shouldNotifyRecommendationRelease(beforeData, afterData)
+    ) {
+      await notifyAthleteRecommendationReleased(
+        event.params.athleteUid,
+        afterData,
+      );
+    }
   },
 );
 
@@ -480,6 +503,100 @@ export const getWeeklyReport = onCall(
     } catch (err) {
       logger.error('getWeeklyReport failed', err);
       throw new HttpsError('internal', 'Could not build weekly report.');
+    }
+  },
+);
+
+/**
+ * Manual LLM-as-judge. Scores one stored output for this athlete against
+ * the rubric for `kind`. Does not run on the live generation path.
+ * Auth: athlete or their assigned coach.
+ */
+export const evaluateLlmOutput = onCall(
+  {
+    timeoutSeconds: 120,
+    memory: '512MiB',
+    secrets: [anthropicApiKey],
+    invoker: 'public',
+  },
+  async (request) => {
+    const { athleteUid } = await requireAthleteOrCoach(request);
+    const kind = request.data?.kind;
+    if (!isPromptKind(kind)) {
+      throw new HttpsError(
+        'invalid-argument',
+        'kind must be one of askAthleteIQ, orchestrator, graded, explain, research, triage, classify, weekly.',
+      );
+    }
+    try {
+      return await evaluateStoredOutput({ athleteUid, kind });
+    } catch (err) {
+      logger.error('evaluateLlmOutput failed', err);
+      throw new HttpsError('internal', 'Could not evaluate that output.');
+    }
+  },
+);
+
+/**
+ * Manual batch judge over stored history (default: first-pass kinds).
+ * Not scheduled. Auth: athlete or their assigned coach.
+ */
+export const evaluateAthleteLlmHistory = onCall(
+  {
+    timeoutSeconds: 180,
+    memory: '512MiB',
+    secrets: [anthropicApiKey],
+    invoker: 'public',
+  },
+  async (request) => {
+    const { athleteUid } = await requireAthleteOrCoach(request);
+    const kinds = parseKinds(request.data?.kinds);
+    try {
+      return await evaluateAthleteHistory({ athleteUid, kinds });
+    } catch (err) {
+      logger.error('evaluateAthleteLlmHistory failed', err);
+      throw new HttpsError('internal', 'Could not evaluate stored outputs.');
+    }
+  },
+);
+
+/**
+ * Human spot-check of a stored judge record. Flags agreement / disagreement
+ * so verbosity and leniency bias can be caught without re-running Claude.
+ */
+export const reviewLlmEvaluation = onCall(
+  {
+    timeoutSeconds: 30,
+    memory: '256MiB',
+    invoker: 'public',
+  },
+  async (request) => {
+    const { athleteUid } = await requireAthleteOrCoach(request);
+    const evalId = String(request.data?.evalId ?? '').trim();
+    if (!evalId) {
+      throw new HttpsError('invalid-argument', 'evalId is required.');
+    }
+    const agreement = String(request.data?.agreement ?? '').trim();
+    if (agreement !== 'agree' && agreement !== 'disagree') {
+      throw new HttpsError('invalid-argument', 'agreement must be agree or disagree.');
+    }
+    const rawIds = request.data?.disagreedItemIds;
+    const disagreedItemIds = Array.isArray(rawIds)
+      ? rawIds.map((id: unknown) => String(id)).filter(Boolean)
+      : [];
+    try {
+      const humanReview = await applyHumanReview({
+        athleteUid,
+        evalId,
+        reviewerUid: request.auth!.uid,
+        agreement,
+        disagreedItemIds,
+        note: String(request.data?.note ?? ''),
+      });
+      return { evalId, humanReview };
+    } catch (err) {
+      logger.error('reviewLlmEvaluation failed', err);
+      throw new HttpsError('not-found', 'Evaluation not found.');
     }
   },
 );

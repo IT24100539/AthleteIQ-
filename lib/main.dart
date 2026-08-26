@@ -22,7 +22,6 @@ import 'screens/connect_coach_screen.dart';
 import 'screens/athlete_main_layout.dart';
 import 'screens/coach_main_layout.dart';
 import 'services/fcm_service.dart';
-import 'dev/demo_accounts.dart';
 import 'dev/widget_catalog.dart';
 
 Future<void> main() async {
@@ -183,14 +182,7 @@ class _AuthGateState extends State<AuthGate> {
             }
 
             if (role == 'coach') {
-              if (kDebugMode && DemoAccounts.isDemoEmail(user.email)) {
-                DemoSession.coachUid = user.uid;
-              }
               return CoachMainLayout(key: ValueKey('coach-${user.uid}'), coachUid: user.uid);
-            }
-
-            if (kDebugMode && DemoAccounts.isDemoEmail(user.email)) {
-              DemoSession.athleteUid = user.uid;
             }
 
             return _AthleteEntry(key: ValueKey('athlete-${user.uid}'), athleteUid: user.uid);

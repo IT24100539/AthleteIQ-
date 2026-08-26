@@ -7,6 +7,12 @@ import { StringOutputParser } from '@langchain/core/output_parsers';
 import { createChatAnthropic } from './anthropic';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { logger } from 'firebase-functions';
+import {
+  GROUNDING_INSTRUCTION,
+  jsonExampleForChatPrompt,
+  MEDICAL_DISCLAIMER,
+} from './promptFragments';
+import { logGuardrailFallback, parseTriageOutput } from './llmGuardrails';
 
 export type PainUrgency = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -21,16 +27,17 @@ export interface PainUrgencyResult {
   source: 'llm' | 'rules';
 }
 
-const TRIAGE_PROMPT = `You triage an athlete's pain report for their coach. This is a triage aid, NOT a medical diagnosis. Do not diagnose or recommend treatment.
+export const TRIAGE_PROMPT = `You triage an athlete's pain report for their coach. ${MEDICAL_DISCLAIMER}
 
 Return JSON only:
-{{"urgency":"LOW|MEDIUM|HIGH","reason":"one short sentence for the coach"}}
+${jsonExampleForChatPrompt('{"urgency":"LOW|MEDIUM|HIGH","reason":"one short sentence for the coach"}')}
 
 Conservative bias (follow strictly):
 - If you are uncertain, the notes are vague, or something more serious cannot be ruled out, use at least MEDIUM. Never choose LOW when unsure.
 - HIGH: cannot bear weight, locking/giving way, numbness/tingling, night pain that wakes them, sudden swelling, suspected fracture/dislocation, chest pain, faint/dizzy with pain, a pop/snap, or severity 5 with alarming language.
 - MEDIUM: persistent or worsening pain, pain that changes training, moderate severity, unclear description, or any doubt.
 - LOW: only when notes clearly describe mild, familiar, improving soreness or DOMS with no red-flag language.
+- ${GROUNDING_INSTRUCTION} Use only the body areas, severity scores, and notes provided.
 
 Keep the reason factual and non-diagnostic.`;
 
@@ -117,33 +124,31 @@ export function ruleBasedPainUrgency(
   };
 }
 
-function parseTriageJson(raw: string): {
-  urgency: PainUrgency;
-  reason: string;
-} | null {
-  const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  if (start === -1 || end <= start) return null;
-  try {
-    const parsed = JSON.parse(trimmed.slice(start, end + 1)) as {
-      urgency?: string;
-      reason?: string;
-    };
-    const urgency = String(parsed.urgency ?? '').toUpperCase();
-    if (urgency !== 'LOW' && urgency !== 'MEDIUM' && urgency !== 'HIGH') {
-      return null;
-    }
-    return {
-      urgency,
-      reason:
-        typeof parsed.reason === 'string' && parsed.reason.trim()
-          ? parsed.reason.trim()
-          : 'Triage flag for coach review.',
-    };
-  } catch {
-    return null;
+export function applyTriageLlmResponse(
+  raw: string,
+  note: string,
+  areas: PainAreaInput[],
+): PainUrgencyResult {
+  const parsed = parseTriageOutput(raw);
+  if (!parsed.ok) {
+    logGuardrailFallback('triage', parsed.reason);
+    return ruleBasedPainUrgency(note, areas);
   }
+
+  const rules = ruleBasedPainUrgency(note, areas);
+  let urgency = parsed.data.urgency;
+  if (urgency === 'LOW' && rules.urgency !== 'LOW') {
+    urgency = rules.urgency;
+  }
+  if (urgency === 'LOW' && note.trim() === '' && maxSeverity(areas) >= 3) {
+    urgency = 'MEDIUM';
+  }
+
+  return {
+    urgency,
+    reason: parsed.data.reason,
+    source: 'llm',
+  };
 }
 
 /**
@@ -177,28 +182,7 @@ export async function classifyPainUrgency(
       areas: areaLines || 'none listed',
       note: note.trim() || '(no free-text notes)',
     });
-    const parsed = parseTriageJson(raw);
-    if (!parsed) {
-      logger.warn('pain urgency: invalid LLM JSON, using rules fallback');
-      return ruleBasedPainUrgency(note, areas);
-    }
-
-    // Conservative: never accept LOW if the model sounded unsure,
-    // or if rules would have raised it higher.
-    const rules = ruleBasedPainUrgency(note, areas);
-    let urgency = parsed.urgency;
-    if (urgency === 'LOW' && rules.urgency !== 'LOW') {
-      urgency = rules.urgency;
-    }
-    if (urgency === 'LOW' && note.trim() === '' && maxSeverity(areas) >= 3) {
-      urgency = 'MEDIUM';
-    }
-
-    return {
-      urgency,
-      reason: parsed.reason,
-      source: 'llm',
-    };
+    return applyTriageLlmResponse(raw, note, areas);
   } catch (err) {
     logger.warn('pain urgency LLM failed; using rules fallback', err);
     return ruleBasedPainUrgency(note, areas);

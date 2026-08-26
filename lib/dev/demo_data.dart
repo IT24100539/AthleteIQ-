@@ -10,8 +10,7 @@ import '../models/team_settings.dart';
 import '../models/weekly_report.dart';
 import 'demo_accounts.dart';
 
-/// In-memory sample records so every screen has something to show for the
-/// debug demo accounts, even when production Firestore rules block a listen.
+/// Sample records used to seed debug demo accounts into Firestore.
 class DemoData {
   static DateTime _day(int daysAgo, {int hour = 12}) {
     final now = DateTime.now();

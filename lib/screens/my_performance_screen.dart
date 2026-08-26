@@ -4,6 +4,7 @@ import '../models/checkin.dart';
 import '../models/risk_result.dart';
 import '../services/firestore_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/approval_gate.dart';
 import '../utils/performance_tips.dart';
 import '../widgets/async_body.dart';
 import '../widgets/empty_state.dart';
@@ -52,6 +53,9 @@ class MyPerformanceScreen extends StatelessWidget {
 
                   final profile = profileSnap.data;
                   final checkIns = checkInSnap.data ?? [];
+                  final released = recommendationReleasedToAthlete(
+                    result.recommendationStatus,
+                  );
                   final perfStatus = result.performanceDisplay;
                   final axis = result.performanceAxisLabel;
                   final tips = buildPerformanceTips(
@@ -89,10 +93,20 @@ class MyPerformanceScreen extends StatelessWidget {
                                         fontWeight: FontWeight.w800,
                                       ),
                                 ),
+                                if (!released) ...[
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Pending coach review',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.amber,
+                                    ),
+                                  ),
+                                ],
                                 const SizedBox(height: 8),
                                 Text(
-                                  result.isReleasedToAthlete &&
-                                          result.reason.trim().isNotEmpty
+                                  released && result.reason.trim().isNotEmpty
                                       ? result.reason
                                       : 'Scores come from your check-ins. Personalized guidance appears after your coach reviews the plan.',
                                   style: TextStyle(

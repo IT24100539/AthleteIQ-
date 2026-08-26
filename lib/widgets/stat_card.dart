@@ -22,6 +22,8 @@ class StatCard extends StatelessWidget {
         children: [
           Text(
             label.toUpperCase(),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: 10, color: AppColors.textMuted, letterSpacing: 0.5),
           ),
           const SizedBox(height: 4),

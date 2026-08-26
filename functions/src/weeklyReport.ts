@@ -15,7 +15,14 @@ import {
   PrivacySettings,
 } from './privacySettings';
 import { wordingSport } from './athleteSports';
+import {
+  GROUNDING_INSTRUCTION,
+  jsonExampleForChatPrompt,
+  MEDICAL_DISCLAIMER,
+  MISSING_METRIC_OMIT,
+} from './promptFragments';
 import { assessRisk } from './riskModel';
+import { logGuardrailFallback, parseWeeklyOutput } from './llmGuardrails';
 
 export interface WeeklyDailyLoad {
   date: string;
@@ -43,14 +50,13 @@ export interface WeeklyReportResult {
   narrativeSource: 'llm' | 'rules';
 }
 
-const NARRATIVE_PROMPT = `You write a short weekly training summary for a coach reading AthleteIQ's "Week in review" screen.
+export const NARRATIVE_PROMPT = `You write a short weekly training summary for a coach reading AthleteIQ's "Week in review" screen.
 
 Rules:
 - 2–3 sentences, conversational, no bullet lists or headers.
-- Use ONLY the numbers and labels provided below. Do not invent, estimate, or round values that are not given.
-- If a metric is null or missing, do not mention it.
-- Do not give medical advice or diagnose injury.
-- Return JSON only: {"narrative":"..."}`;
+- ${GROUNDING_INSTRUCTION} Use ONLY the numbers and labels provided below. ${MISSING_METRIC_OMIT}
+- ${MEDICAL_DISCLAIMER}
+- Return JSON only: ${jsonExampleForChatPrompt('{"narrative":"..."}')}`;
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
@@ -145,19 +151,16 @@ function ruleBasedNarrative(data: Omit<WeeklyReportResult, 'narrative' | 'narrat
   return parts.join(' ');
 }
 
-function parseNarrativeJson(raw: string): string | null {
-  const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  if (start === -1 || end <= start) return null;
-  try {
-    const parsed = JSON.parse(trimmed.slice(start, end + 1)) as { narrative?: unknown };
-    return typeof parsed.narrative === 'string' && parsed.narrative.trim()
-      ? parsed.narrative.trim()
-      : null;
-  } catch {
-    return null;
+export function applyWeeklyLlmResponse(
+  raw: string,
+  fallbackNarrative: string,
+): { narrative: string; source: 'llm' | 'rules' } {
+  const parsed = parseWeeklyOutput(raw);
+  if (!parsed.ok) {
+    logGuardrailFallback('weekly', parsed.reason);
+    return { narrative: fallbackNarrative, source: 'rules' };
   }
+  return { narrative: parsed.data.narrative, source: 'llm' };
 }
 
 function buildStatsContext(data: Omit<WeeklyReportResult, 'narrative' | 'narrativeSource'>): string {
@@ -197,12 +200,7 @@ async function generateNarrative(
     ]);
     const chain = prompt.pipe(model).pipe(new StringOutputParser());
     const raw = await chain.invoke({ stats: buildStatsContext(data) });
-    const parsed = parseNarrativeJson(raw);
-    if (!parsed) {
-      logger.warn('weekly report: invalid LLM JSON, using rules fallback');
-      return { narrative: fallback, source: 'rules' };
-    }
-    return { narrative: parsed, source: 'llm' };
+    return applyWeeklyLlmResponse(raw, fallback);
   } catch (err) {
     logger.warn('weekly report LLM failed; using rules fallback', err);
     return { narrative: fallback, source: 'rules' };
@@ -232,18 +230,18 @@ export async function buildWeeklyReport(
   for (const dayKey of dayKeys) {
     const slice = entriesUpTo(entries, dayKey);
     if (slice.length < 5) continue;
-    const { acwr } = calculateACWR(slice);
+    const { acwr } = calculateACWR(slice, dayKey);
     if (peakAcwr == null || acwr > peakAcwr) peakAcwr = acwr;
   }
 
   const endSlice = entriesUpTo(entries, weekEnd);
   const endAcwr =
-    endSlice.length >= 5 ? calculateACWR(endSlice).acwr : null;
+    endSlice.length >= 5 ? calculateACWR(endSlice, weekEnd).acwr : null;
 
   let riskLevel: string | null = null;
   let recoveryTrend: string | null = null;
   if (endSlice.length >= 5) {
-    const assessment = assessRisk(endSlice, sportGroup);
+    const assessment = assessRisk(endSlice, sportGroup, weekEnd);
     riskLevel = assessment.riskLevel;
     recoveryTrend = assessment.recoveryTrend;
   }

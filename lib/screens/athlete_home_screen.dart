@@ -4,6 +4,7 @@ import '../models/checkin.dart';
 import '../models/risk_result.dart';
 import '../services/firestore_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/approval_gate.dart';
 import '../utils/this_week_plan.dart';
 import '../utils/stream_fallback.dart';
 import '../utils/wearable_sync_status.dart';
@@ -127,7 +128,9 @@ class _AthleteHomeScreenState extends State<AthleteHomeScreen> {
             stream: _riskStream,
             builder: (context, snapshot) {
               final result = snapshot.data;
-              final isReleased = result?.isReleasedToAthlete ?? false;
+              // Section 6 / 11 / 17.1 — only approved | modified reach the athlete.
+              final isReleased =
+                  recommendationReleasedToAthlete(result?.recommendationStatus);
 
               return StreamBuilder<List<CheckIn>>(
                 stream: _checkInStream,
@@ -200,13 +203,17 @@ class _AthleteHomeScreenState extends State<AthleteHomeScreen> {
                                     children: [
                                       Row(
                                         children: [
-                                          Text(
+                                          Flexible(
+                                            child: Text(
                                             activeDevice ?? 'No wearable connected',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
                                               fontWeight: FontWeight.w700,
                                               fontSize: 13,
                                               color: AppColors.textPrimary,
                                             ),
+                                          ),
                                           ),
                                           const SizedBox(width: 6),
                                           Container(
@@ -239,6 +246,8 @@ class _AthleteHomeScreenState extends State<AthleteHomeScreen> {
                                         activeDevice != null
                                             ? 'Auto-syncing workouts & biometrics'
                                             : 'Tap to connect Apple Watch, Health Connect, or Garmin',
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                           fontSize: 11,
                                           color: AppColors.textSecondary,
@@ -366,20 +375,28 @@ class _AthleteHomeScreenState extends State<AthleteHomeScreen> {
                                         builder: (_) =>
                                             CheckInScreen(athleteUid: widget.athleteUid)),
                                   ),
-                                  child: const Text("Log check-in"),
+                                  child: const FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text("Log check-in"),
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              OutlinedButton.icon(
+                              Expanded(
+                                child: OutlinedButton.icon(
                                 onPressed: () => _openReportPain(context),
                                 icon: const Icon(Icons.warning_amber_rounded,
                                     color: AppColors.coral, size: 18),
-                                label: const Text('Report pain',
+                                label: const FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text('Report pain',
                                     style: TextStyle(color: AppColors.coral)),
+                                ),
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(
                                       color: AppColors.coral.withValues(alpha: 0.4)),
                                 ),
+                              ),
                               ),
                             ],
                           ),
@@ -506,6 +523,8 @@ class _PlanDayRow extends StatelessWidget {
             child: Text(
               day.activity,
               textAlign: TextAlign.right,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 13,
                 color: day.isRest ||

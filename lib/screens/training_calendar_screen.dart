@@ -127,23 +127,29 @@ class TrainingCalendarScreen extends StatelessWidget {
                       border: Border.all(color: AppColors.border),
                     ),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _LegendItem(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Flexible(
+                        child: _LegendItem(
                           color: AppColors.mintTint,
                           label: 'Trained',
                         ),
-                        _LegendItem(
+                      ),
+                      Flexible(
+                        child: _LegendItem(
                           color: AppColors.calendarRest,
                           label: 'Rest',
                         ),
-                        _LegendItem(
+                      ),
+                      Flexible(
+                        child: _LegendItem(
                           color: AppColors.surface,
                           borderColor: AppColors.mint,
                           label: 'Today',
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
                   ),
                 ],
               ),
@@ -245,6 +251,7 @@ class _LegendItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           width: 12,
@@ -256,9 +263,12 @@ class _LegendItem extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        Text(
+        Flexible(
+          child: Text(
           label,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        ),
         ),
       ],
     );

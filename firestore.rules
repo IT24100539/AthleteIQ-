@@ -171,11 +171,15 @@ service cloud.firestore {
             (docId != 'latest' && docId != 'athleteView')
           ));
         // Only the coach may change recommendationStatus (Section 6 / 11
-        // — Human Approval Step, sole approval authority).
+        // — Human Approval Step, sole approval authority). Scores, LLM
+        // prose, and orchestrator output are not client-writable.
         allow update: if isCoachOf(athleteUid) &&
           docId == 'latest' &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['recommendationStatus', 'recommendation', 'reviewedAt']);
+            .hasOnly(['recommendationStatus', 'recommendation', 'reviewedAt', 'reviewedBy']) &&
+          request.resource.data.recommendationStatus in ['approved', 'rejected', 'modified'] &&
+          request.resource.data.reviewedBy == request.auth.uid &&
+          request.resource.data.reviewedAt is string;
       }
 
       match /devices/{deviceId} {
@@ -216,6 +220,13 @@ service cloud.firestore {
 
       match /orchestratorTraces/{traceId} {
         // LangChain Orchestrator reasoning log. Admin SDK writes only.
+        allow read: if isSelf(athleteUid) || isCoachOf(athleteUid);
+        allow write: if false;
+      }
+
+      match /llmEvaluations/{evalId} {
+        // LLM-as-judge records + human spot-checks. Written only by
+        // evaluateLlmOutput / evaluateAthleteLlmHistory / reviewLlmEvaluation.
         allow read: if isSelf(athleteUid) || isCoachOf(athleteUid);
         allow write: if false;
       }

@@ -14,13 +14,11 @@ import '../models/weekly_report.dart';
 import '../models/team_settings.dart';
 import '../models/privacy_settings.dart';
 import '../models/risk_latest.dart';
+import '../utils/approval_gate.dart';
 import '../utils/combine_latest.dart';
 import '../utils/friendly_error.dart';
 import '../utils/privacy_redaction.dart';
 import '../utils/stream_fallback.dart';
-import '../dev/demo_accounts.dart';
-import '../dev/demo_data.dart';
-import '../dev/demo_overlay.dart';
 import 'health_sync_service.dart';
 
 class FirestoreService {
@@ -28,23 +26,6 @@ class FirestoreService {
 
   bool _viewerIsOwner(String athleteUid) =>
       FirebaseAuth.instance.currentUser?.uid == athleteUid;
-
-  Stream<T> _liveOrDemo<T>(
-    Stream<T> live,
-    T Function() demo, {
-    required T empty,
-    bool preferLive = false,
-  }) {
-    if (DemoOverlay.enabled && !preferLive) {
-      return Stream<T>.multi((controller) {
-        controller.add(demo());
-      });
-    }
-    if (DemoOverlay.enabled && preferLive) {
-      return emitOnError(live, demo());
-    }
-    return emitOnError(live, empty);
-  }
 
   Stream<T> _forCoachViewer<T>(
     String athleteUid,
@@ -141,12 +122,7 @@ class FirestoreService {
       if (_viewerIsOwner(uid)) return profile;
       return profile.redactedForCoach();
     });
-    return _liveOrDemo(
-      live,
-      () => DemoData.athleteProfile(uid, coachUid: ''),
-      empty: AthleteProfile.fromMap(uid, {}),
-      preferLive: true,
-    );
+    return emitOnError(live, AthleteProfile.fromMap(uid, {}));
   }
 
   /// One-shot read for the auth gate. Avoids the web Watch listener that
@@ -159,46 +135,16 @@ class FirestoreService {
               const GetOptions(source: Source.server),
             );
         final profile = AthleteProfile.fromMap(uid, doc.data() ?? {});
-        final resolved =
-            _viewerIsOwner(uid) ? profile : profile.redactedForCoach();
-        if (DemoOverlay.enabled && !resolved.hasSport) {
-          return DemoData.athleteProfile(uid, coachUid: '');
-        }
-        if (DemoOverlay.enabled && _viewerIsOwner(uid)) {
-          DemoSession.athleteUid = uid;
-          DemoSession.coachUid = resolved.coachUid ?? DemoSession.coachUid;
-        }
-        return resolved;
+        return _viewerIsOwner(uid) ? profile : profile.redactedForCoach();
       } catch (e) {
         lastError = e;
         await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
       }
     }
-    if (DemoOverlay.enabled) {
-      return DemoData.athleteProfile(uid, coachUid: '');
-    }
     throw lastError ?? Exception('Could not load profile.');
   }
 
   Future<Map<String, String?>> getUserDisplayName(String uid) async {
-    if (DemoOverlay.enabled) {
-      final me = FirebaseAuth.instance.currentUser;
-      final lookingAtSelf = uid == me?.uid;
-      final meEmail = me?.email?.toLowerCase();
-      final asCoach = uid == DemoSession.coachUid ||
-          (lookingAtSelf && meEmail == DemoAccounts.coachEmail) ||
-          (!lookingAtSelf && meEmail == DemoAccounts.athleteEmail);
-      if (asCoach) {
-        return {
-          'name': DemoAccounts.coachName,
-          'email': DemoAccounts.coachEmail,
-        };
-      }
-      return {
-        'name': DemoAccounts.athleteName,
-        'email': DemoAccounts.athleteEmail,
-      };
-    }
     return _readPersonDisplay(uid);
   }
 
@@ -232,15 +178,7 @@ class FirestoreService {
         'email': data['email'] as String?,
       };
     });
-    return _liveOrDemo(
-      live,
-      () => {
-        'name': DemoAccounts.coachName,
-        'email': DemoAccounts.coachEmail,
-      },
-      empty: const {'name': null, 'email': null},
-      preferLive: true,
-    );
+    return emitOnError(live, const {'name': null, 'email': null});
   }
 
   Stream<Map<String, String?>> streamUserDisplayName(String uid) {
@@ -251,36 +189,7 @@ class FirestoreService {
         'email': data['email'] as String?,
       };
     });
-    return _liveOrDemo(
-      live,
-      () {
-        final me = FirebaseAuth.instance.currentUser;
-        if (uid == me?.uid) {
-          if (me?.email?.toLowerCase() == DemoAccounts.coachEmail) {
-            return {
-              'name': DemoAccounts.coachName,
-              'email': DemoAccounts.coachEmail,
-            };
-          }
-          return {
-            'name': DemoAccounts.athleteName,
-            'email': DemoAccounts.athleteEmail,
-          };
-        }
-        if (uid == DemoSession.coachUid ||
-            me?.email?.toLowerCase() == DemoAccounts.athleteEmail) {
-          return {
-            'name': DemoAccounts.coachName,
-            'email': DemoAccounts.coachEmail,
-          };
-        }
-        return {
-          'name': DemoAccounts.athleteName,
-          'email': DemoAccounts.athleteEmail,
-        };
-      },
-      empty: const {'name': null, 'email': null},
-    );
+    return emitOnError(live, const {'name': null, 'email': null});
   }
 
   // ---------- Devices & Data Tiers ----------
@@ -413,11 +322,7 @@ class FirestoreService {
       }
       return map;
     });
-    return _liveOrDemo(
-      live,
-      DemoData.devices,
-      empty: const <String, Map<String, dynamic>>{},
-    );
+    return emitOnError(live, const <String, Map<String, dynamic>>{});
   }
 
   // ---------- Daily check-in ----------
@@ -609,11 +514,7 @@ class FirestoreService {
         coachView: coachView,
       ).date;
     });
-    return _liveOrDemo(
-      live,
-      () => DemoData.checkIns().isEmpty ? null : DemoData.checkIns().last.date,
-      empty: null,
-    );
+    return emitOnError(live, null);
   }
 
   Stream<List<CheckIn>> recentCheckIns(String athleteUid, {int days = 35}) {
@@ -629,11 +530,7 @@ class FirestoreService {
         .map((qs) => qs.docs
             .map((d) => _parseCheckIn(d.id, d.data(), coachView: coachView))
             .toList());
-    return _liveOrDemo(
-      raw,
-      () => DemoData.checkIns().reversed.toList(),
-      empty: const <CheckIn>[],
-    );
+    return emitOnError(raw, const <CheckIn>[]);
   }
 
   // ---------- Risk / recommendation ----------
@@ -660,11 +557,15 @@ class FirestoreService {
       return RiskLatest(result: RiskResult.fromMap(data));
     });
     if (_viewerIsOwner(athleteUid)) {
-      return _liveOrDemo(
-        raw,
-        () => RiskLatest(result: DemoData.riskResult()),
-        empty: const RiskLatest(),
-      );
+      final gated = raw.map((latest) {
+        if (latest.result == null) return latest;
+        return RiskLatest(
+          result: redactUnreleasedRecommendation(latest.result!),
+          insufficientData: latest.insufficientData,
+          checkInCount: latest.checkInCount,
+        );
+      });
+      return emitOnError(gated, const RiskLatest());
     }
     final withPrivacy = combineLatest2(raw, streamPrivacySettings(athleteUid),
         (RiskLatest latest, PrivacySettings privacy) {
@@ -675,11 +576,7 @@ class FirestoreService {
         checkInCount: latest.checkInCount,
       );
     });
-    return _liveOrDemo(
-      withPrivacy,
-      () => RiskLatest(result: DemoData.riskResult()),
-      empty: const RiskLatest(),
-    );
+    return emitOnError(withPrivacy, const RiskLatest());
   }
 
   Stream<RiskResult?> latestRiskResult(String athleteUid) {
@@ -709,10 +606,9 @@ class FirestoreService {
       points.sort((a, b) => a.date.compareTo(b.date));
       return points;
     });
-    return _liveOrDemo(
+    return emitOnError(
       _forCoachViewer(athleteUid, raw, redactRiskHistoryForCoach),
-      DemoData.riskHistory,
-      empty: const <RiskHistoryPoint>[],
+      const <RiskHistoryPoint>[],
     );
   }
 
@@ -721,6 +617,10 @@ class FirestoreService {
     required String decision,
     String? modifiedText,
   }) {
+    final coachUid = FirebaseAuth.instance.currentUser?.uid;
+    if (coachUid == null) {
+      throw StateError('Sign in required to review a recommendation.');
+    }
     return _db
         .collection('athletes')
         .doc(athleteUid)
@@ -730,6 +630,7 @@ class FirestoreService {
       'recommendationStatus': decision,
       if (modifiedText != null) 'recommendation': modifiedText,
       'reviewedAt': DateTime.now().toIso8601String(),
+      'reviewedBy': coachUid,
     });
   }
 
@@ -743,17 +644,6 @@ class FirestoreService {
         .map((qs) => qs.docs
             .map((d) => AthleteProfile.fromMap(d.id, d.data()).redactedForCoach())
             .toList());
-    if (DemoOverlay.enabled) {
-      return emitOnError(
-        live,
-        [
-          DemoData.athleteProfile(
-            DemoSession.athleteUid ?? 'demo-athlete',
-            coachUid: coachUid,
-          ),
-        ],
-      );
-    }
     return live;
   }
 
@@ -770,11 +660,7 @@ class FirestoreService {
         .doc('default')
         .snapshots()
         .map((doc) => TeamSettings.fromMap(doc.data()));
-    return _liveOrDemo(
-      live,
-      DemoData.teamSettings,
-      empty: TeamSettings.fromMap(null),
-    );
+    return emitOnError(live, TeamSettings.fromMap(null));
   }
 
   Future<void> updateTeamSettings(String coachUid, TeamSettings settings) async {
@@ -792,36 +678,29 @@ class FirestoreService {
   // ---------- Coach invite ----------
 
   Future<String?> getCoachInviteCode(String coachUid) async {
-    try {
-      final ref = _db.collection('coaches').doc(coachUid);
-      final doc = await ref.get();
-      if (doc.exists && doc.data()?['inviteCode'] != null) {
-        return doc.data()!['inviteCode'] as String;
-      }
-
-      final userDoc = await _db.collection('users').doc(coachUid).get();
-      if (userDoc.data()?['role'] != 'coach') {
-        return DemoOverlay.enabled ? DemoAccounts.inviteCode : null;
-      }
-
-      final code = DemoOverlay.enabled
-          ? DemoAccounts.inviteCode
-          : _generateInviteCode();
-      await ref.set({
-        'name': userDoc.data()?['name'] ?? '',
-        'email': userDoc.data()?['email'] ?? '',
-        'inviteCode': code,
-        'createdAt': DateTime.now().toIso8601String(),
-      }, SetOptions(merge: true));
-      await ref.collection('teamSettings').doc('default').set(
-        const TeamSettings(defaultActionPercent: TeamSettings.defaultPercent).toMap(),
-        SetOptions(merge: true),
-      );
-      return code;
-    } catch (_) {
-      if (DemoOverlay.enabled) return DemoAccounts.inviteCode;
-      rethrow;
+    final ref = _db.collection('coaches').doc(coachUid);
+    final doc = await ref.get();
+    if (doc.exists && doc.data()?['inviteCode'] != null) {
+      return doc.data()!['inviteCode'] as String;
     }
+
+    final userDoc = await _db.collection('users').doc(coachUid).get();
+    if (userDoc.data()?['role'] != 'coach') {
+      return null;
+    }
+
+    final code = _generateInviteCode();
+    await ref.set({
+      'name': userDoc.data()?['name'] ?? '',
+      'email': userDoc.data()?['email'] ?? '',
+      'inviteCode': code,
+      'createdAt': DateTime.now().toIso8601String(),
+    }, SetOptions(merge: true));
+    await ref.collection('teamSettings').doc('default').set(
+      const TeamSettings(defaultActionPercent: TeamSettings.defaultPercent).toMap(),
+      SetOptions(merge: true),
+    );
+    return code;
   }
 
   String _generateInviteCode() {
@@ -956,21 +835,16 @@ class FirestoreService {
     }
 
     if (_viewerIsOwner(athleteUid)) {
-      return _liveOrDemo(
-        query(),
-        () => DemoData.painReports(athleteUid),
-        empty: const <PainReport>[],
-      );
+      return emitOnError(query(), const <PainReport>[]);
     }
-    return _liveOrDemo(
+    return emitOnError(
       streamPrivacySettings(athleteUid).asyncExpand((privacy) {
         if (!privacy.injuryHistory) {
           return Stream.value(<PainReport>[]);
         }
         return query();
       }),
-      () => DemoData.painReports(athleteUid),
-      empty: const <PainReport>[],
+      const <PainReport>[],
     );
   }
 
@@ -985,14 +859,7 @@ class FirestoreService {
         .snapshots()
         .map((qs) =>
             qs.docs.map((d) => ChatMessage.fromMap(d.id, d.data())).toList());
-    return _liveOrDemo(
-      live,
-      () => DemoData.coachMessages(
-        athleteUid,
-        DemoSession.coachUid ?? FirebaseAuth.instance.currentUser?.uid ?? 'demo-coach',
-      ),
-      empty: const <ChatMessage>[],
-    );
+    return emitOnError(live, const <ChatMessage>[]);
   }
 
   Future<void> sendCoachMessage(String athleteUid, String text) async {
@@ -1031,19 +898,7 @@ class FirestoreService {
       final doc = qs.docs.first;
       return ChatMessage.fromMap(doc.id, doc.data());
     });
-    return _liveOrDemo(
-      live,
-      () {
-        final messages = DemoData.coachMessages(
-          athleteUid,
-          DemoSession.coachUid ??
-              FirebaseAuth.instance.currentUser?.uid ??
-              'demo-coach',
-        );
-        return messages.isEmpty ? null : messages.last;
-      },
-      empty: null,
-    );
+    return emitOnError(live, null);
   }
 
   /// Coach last-read cursor for a thread — `coaches/{coachUid}/inboxRead/{athleteUid}`.
@@ -1058,11 +913,7 @@ class FirestoreService {
       final raw = doc.data()?['lastReadAt'] as String?;
       return DateTime.tryParse(raw ?? '');
     });
-    return _liveOrDemo(
-      live,
-      () => DateTime.now().subtract(const Duration(hours: 12)),
-      empty: null,
-    );
+    return emitOnError(live, null);
   }
 
   Future<void> markInboxThreadRead(String coachUid, String athleteUid) {
@@ -1106,7 +957,6 @@ class FirestoreService {
     String athleteUid, {
     int weekOffset = 0,
   }) async {
-    if (DemoOverlay.enabled) return DemoData.weeklyReport();
     if (FirebaseAuth.instance.currentUser == null) {
       throw Exception('You must be signed in.');
     }
@@ -1130,7 +980,6 @@ class FirestoreService {
       );
       return redactWeeklyReportForCoach(report, privacy);
     } catch (e) {
-      if (DemoOverlay.enabled) return DemoData.weeklyReport();
       if (e is FirebaseFunctionsException) {
         throw Exception(friendlyFunctionsMessage(e));
       }
@@ -1153,7 +1002,7 @@ class FirestoreService {
         .snapshots()
         .map((qs) =>
             qs.docs.map((d) => CoachAlert.fromMap(d.id, d.data())).toList());
-    return _liveOrDemo(
+    return emitOnError(
       combineLatest2(raw, rosterForCoach(coachUid),
           (List<CoachAlert> alerts, List<AthleteProfile> roster) {
         final privacyByUid = {
@@ -1165,10 +1014,7 @@ class FirestoreService {
           return privacy.allowsCoachAlertType(alert.type);
         }).toList();
       }),
-      () => DemoData.coachAlerts(
-        DemoSession.athleteUid ?? 'demo-athlete',
-      ),
-      empty: const <CoachAlert>[],
+      const <CoachAlert>[],
     );
   }
 
@@ -1181,11 +1027,7 @@ class FirestoreService {
         .snapshots()
         .map((qs) =>
             qs.docs.map((d) => AthleteAlert.fromMap(d.id, d.data())).toList());
-    return _liveOrDemo(
-      live,
-      DemoData.athleteAlerts,
-      empty: const <AthleteAlert>[],
-    );
+    return emitOnError(live, const <AthleteAlert>[]);
   }
 
   // ---------- Ask AthleteIQ (AI Q&A Engine) ----------
@@ -1199,11 +1041,7 @@ class FirestoreService {
         .snapshots()
         .map((qs) =>
             qs.docs.map((d) => ChatMessage.fromMap(d.id, d.data())).toList());
-    return _liveOrDemo(
-      live,
-      () => DemoData.aiChat(athleteUid),
-      empty: const <ChatMessage>[],
-    );
+    return emitOnError(live, const <ChatMessage>[]);
   }
 
   /// Calls the `askAthleteIQ` Cloud Function. The function writes both the
@@ -1306,6 +1144,6 @@ class FirestoreService {
         doc.data()?['privacySettings'] as Map<String, dynamic>?,
       );
     });
-    return _liveOrDemo(live, () => PrivacySettings.open, empty: PrivacySettings.open);
+    return emitOnError(live, PrivacySettings.open);
   }
 }

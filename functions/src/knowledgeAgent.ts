@@ -16,7 +16,10 @@ import * as fs from 'fs';
 import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
 import { MemoryVectorStore } from 'langchain/vectorstores/memory';
 import * as path from 'path';
+import { CORPUS_GROUNDING_INSTRUCTION } from './promptFragments';
 import { RiskAssessment } from './riskModel';
+import { logGuardrailFallback, parseResearchOutput } from './llmGuardrails';
+import { traceKnowledgeToLangSmith } from './langsmithDevTrace';
 
 export interface ResearchCitation {
   tag: string;
@@ -79,11 +82,11 @@ class HashedNgramEmbeddings extends Embeddings {
   }
 }
 
-/** Plain SystemMessage — no ChatPromptTemplate, so JSON braces are literal. */
-const RESEARCH_PROMPT = `You are AthleteIQ's Knowledge Agent. You write a short research note for a coach explaining why a risk call is scientifically grounded.
+/** Plain SystemMessage — no ChatPromptTemplate, so JSON braces stay single. */
+export const RESEARCH_PROMPT = `You are AthleteIQ's Knowledge Agent. You write a short research note for a coach explaining why a risk call is scientifically grounded.
 
 Rules:
-- Use ONLY the retrieved reference notes below. Do not invent papers, authors, journals, years, or numbers.
+- ${CORPUS_GROUNDING_INSTRUCTION}
 - Keep the "note" to 1-2 sentences. Mention the ACWR controversy if any retrieved chunk discusses it.
 - Return JSON only, no markdown fences:
 {"note":"...","citations":[{"tag":"...","text":"...","source":"..."}]}
@@ -204,26 +207,27 @@ function defaultNote(assessment: RiskAssessment): string {
   return 'This call is grounded in session-RPE training load, ACWR, and a simplified Banister Fitness–Fatigue read of the same series — models, not lab tests.';
 }
 
-function parseJsonObject(raw: string): { note?: string; citations?: ResearchCitation[] } | null {
-  const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  if (start === -1 || end <= start) return null;
-  try {
-    return JSON.parse(trimmed.slice(start, end + 1)) as {
-      note?: string;
-      citations?: ResearchCitation[];
-    };
-  } catch {
-    return null;
-  }
-}
-
 function retrievedFallback(assessment: RiskAssessment, docs: Document[]): ResearchNote {
   return {
     note: defaultNote(assessment),
     citations: citationsFromDocs(docs),
     source: 'retrieved',
+  };
+}
+
+export function applyResearchLlmResponse(
+  raw: string,
+  fallback: ResearchNote,
+): ResearchNote {
+  const parsed = parseResearchOutput(raw);
+  if (!parsed.ok) {
+    logGuardrailFallback('research', parsed.reason);
+    return fallback;
+  }
+  return {
+    note: parsed.data.note.trim(),
+    citations: parsed.data.citations,
+    source: 'llm',
   };
 }
 
@@ -233,11 +237,44 @@ function retrievedFallback(assessment: RiskAssessment, docs: Document[]): Resear
  * if the LLM is missing or fails.
  */
 export async function generateResearchNote(assessment: RiskAssessment): Promise<ResearchNote> {
+  const started = Date.now();
+  const retrieveStart = Date.now();
   const docs = await retrieveResearchChunks(assessment);
+  const retrieveLatencyMs = Date.now() - retrieveStart;
   const fallback = retrievedFallback(assessment, docs);
+  const retrievedTags = docs
+    .map((d) => String(d.metadata.tag ?? d.metadata.file ?? 'chunk'))
+    .filter(Boolean);
+
+  const emit = async (
+    result: ResearchNote,
+    extra: { schemaValidationFailed: boolean; schemaFailureReason: string | null; llmLatencyMs: number; fallbackReason: string | null },
+  ): Promise<ResearchNote> => {
+    await traceKnowledgeToLangSmith({
+      surface: 'knowledge_agent',
+      privacy: 'redacted_no_phi',
+      retrievedTags,
+      retrievedCount: docs.length,
+      retrieveLatencyMs,
+      llmLatencyMs: extra.llmLatencyMs,
+      totalLatencyMs: Date.now() - started,
+      schemaValidationFailed: extra.schemaValidationFailed,
+      schemaFailureReason: extra.schemaFailureReason,
+      fallbackTriggered: result.source !== 'llm',
+      fallbackReason: extra.fallbackReason,
+      source: result.source,
+    });
+    return result;
+  };
+
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey || docs.length === 0) {
-    return fallback;
+    return emit(fallback, {
+      schemaValidationFailed: false,
+      schemaFailureReason: null,
+      llmLatencyMs: 0,
+      fallbackReason: !apiKey ? 'missing_api_key' : 'no_retrieved_chunks',
+    });
   }
 
   const retrieved = docs
@@ -258,32 +295,42 @@ export async function generateResearchNote(assessment: RiskAssessment): Promise<
       'Retrieved notes:',
       retrieved,
     ].join('\n');
+    const llmStart = Date.now();
     const raw = await model.pipe(new StringOutputParser()).invoke([
       new SystemMessage(RESEARCH_PROMPT),
       new HumanMessage(human),
     ]);
-    const parsed = parseJsonObject(raw);
-    if (!parsed?.note || !Array.isArray(parsed.citations) || parsed.citations.length === 0) {
-      logger.warn('knowledge agent: invalid LLM JSON, using retrieved fallback', {
-        rawPreview: raw.slice(0, 400),
+    const llmLatencyMs = Date.now() - llmStart;
+    const parsed = parseResearchOutput(raw);
+    if (!parsed.ok) {
+      logGuardrailFallback('research', parsed.reason);
+      return emit(fallback, {
+        schemaValidationFailed: true,
+        schemaFailureReason: parsed.reason,
+        llmLatencyMs,
+        fallbackReason: 'schema_or_business_rule',
       });
-      return fallback;
     }
-    const citations = parsed.citations
-      .filter((c) => c && c.tag && c.text && c.source)
-      .slice(0, 3)
-      .map((c) => ({
-        tag: String(c.tag),
-        text: String(c.text),
-        source: String(c.source),
-      }));
-    if (citations.length === 0) {
-      logger.warn('knowledge agent: citations missing tag/text/source, using retrieved fallback');
-      return fallback;
-    }
-    return { note: parsed.note.trim(), citations, source: 'llm' };
+    return emit(
+      {
+        note: parsed.data.note.trim(),
+        citations: parsed.data.citations,
+        source: 'llm',
+      },
+      {
+        schemaValidationFailed: false,
+        schemaFailureReason: null,
+        llmLatencyMs,
+        fallbackReason: null,
+      },
+    );
   } catch (err) {
     logger.error('knowledge agent LLM failed', err);
-    return fallback;
+    return emit(fallback, {
+      schemaValidationFailed: false,
+      schemaFailureReason: null,
+      llmLatencyMs: 0,
+      fallbackReason: 'llm_error',
+    });
   }
 }

@@ -110,13 +110,13 @@ export interface RiskAssessment {
 export function assessRisk(
   entriesRecentFirst: DailyEntry[],
   sportGroup?: SportGroup | string | null,
+  asOf?: string,
 ): RiskAssessment {
-  const { acwr, acute7, chronicAvgWeekly } = calculateACWR(entriesRecentFirst);
-  const { trend: recoveryTrend, usedHRV } = calculateRecoveryTrend(entriesRecentFirst);
-  const fatiguePersistent = isFatiguePersistent(entriesRecentFirst);
+  const { acwr, acute7, chronicAvgWeekly } = calculateACWR(entriesRecentFirst, asOf);
+  const { trend: recoveryTrend, usedHRV } = calculateRecoveryTrend(entriesRecentFirst, asOf);
+  const fatiguePersistent = isFatiguePersistent(entriesRecentFirst, asOf);
 
-  const entriesOldestFirst = [...entriesRecentFirst].reverse();
-  const { performanceIndex } = calculateFitnessFatigue(entriesOldestFirst);
+  const { performanceIndex } = calculateFitnessFatigue(entriesRecentFirst, asOf);
 
   // --- Step 5: rule-based combination ---
   // Section 18.4 — ACWR thresholds below (1.5 / 1.3 / 0.8–1.3) are fixed

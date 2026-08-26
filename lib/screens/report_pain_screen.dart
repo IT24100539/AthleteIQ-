@@ -38,7 +38,8 @@ class _ReportPainScreenState extends State<ReportPainScreen> {
         builder: (ctx, setDialogState) => AlertDialog(
           backgroundColor: AppColors.surface,
           title: Text('Add Pain Area', style: TextStyle(color: AppColors.textPrimary)),
-          content: Column(
+          content: SingleChildScrollView(
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
@@ -84,6 +85,7 @@ class _ReportPainScreenState extends State<ReportPainScreen> {
                 }),
               ),
             ],
+            ),
           ),
           actions: [
             TextButton(
@@ -156,13 +158,20 @@ class _ReportPainScreenState extends State<ReportPainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: const Text('Report pain'),
         centerTitle: true,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.screenEdge),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.screenEdge,
+            AppSpacing.screenEdge,
+            AppSpacing.screenEdge,
+            AppSpacing.screenEdge + 24,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -248,6 +257,7 @@ class _ReportPainScreenState extends State<ReportPainScreen> {
                 controller: _notesController,
                 maxLines: 4,
                 textCapitalization: TextCapitalization.sentences,
+                scrollPadding: const EdgeInsets.only(bottom: 120),
                 decoration: const InputDecoration(
                   hintText: 'What happened, when it started, what makes it worse…',
                 ),
@@ -311,48 +321,56 @@ class _PainRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border.all(color: AppColors.border),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.location_on_outlined, color: AppColors.coral, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              area.location,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: AppColors.textPrimary,
+          Row(
+            children: [
+              const Icon(Icons.location_on_outlined, color: AppColors.coral, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  area.location,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
               ),
-            ),
+              IconButton(
+                icon: Icon(Icons.close, color: AppColors.textFaint, size: 18),
+                onPressed: onRemove,
+              ),
+            ],
           ),
+          const SizedBox(height: 4),
           Row(
             children: List.generate(5, (i) {
               final lvl = i + 1;
               final active = lvl <= area.severity;
-              return SizedBox(
-                width: 40,
-                height: 48,
-                child: InkWell(
-                onTap: () => onSeverityChanged(lvl),
-                customBorder: const CircleBorder(),
-                child: Center(
-                  child: Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: active ? AppColors.coral : AppColors.border,
+              return Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: InkWell(
+                    onTap: () => onSeverityChanged(lvl),
+                    customBorder: const CircleBorder(),
+                    child: Center(
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: active ? AppColors.coral : AppColors.border,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                ),
                 ),
               );
             }),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: Icon(Icons.close, color: AppColors.textFaint, size: 18),
-            onPressed: onRemove,
           ),
         ],
       ),

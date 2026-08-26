@@ -141,6 +141,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           children: [
                             Text(
                               name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
@@ -150,6 +152,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             const SizedBox(height: 2),
                             Text(
                               sportLine,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppColors.textSecondary,
@@ -193,7 +197,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 leading: Icon(Icons.upload_file_outlined, color: AppColors.textSecondary, size: 20),
                 title: Row(
                   children: [
-                    const Text('Import training log'),
+                    const Flexible(
+                      child: Text(
+                        'Import training log',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -363,6 +372,8 @@ class _CoachConnectionCardState extends State<_CoachConnectionCard> {
                             children: [
                               Text(
                                 coachName.isEmpty ? 'Coach connected' : coachName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -374,6 +385,8 @@ class _CoachConnectionCardState extends State<_CoachConnectionCard> {
                                 email.isEmpty
                                     ? 'You\'re on this coach\'s roster'
                                     : email,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: AppColors.textSecondary,

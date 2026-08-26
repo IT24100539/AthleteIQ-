@@ -9,8 +9,8 @@ import 'demo_accounts.dart';
 import 'demo_data.dart';
 
 /// Creates the demo athlete + coach Auth users (if needed) and writes sample
-/// docs the client is allowed to write. Risk, alerts, and weekly reports are
-/// function-only in rules — those screens use [DemoOverlay] instead.
+/// docs the client is allowed to write. Risk, alerts, and weekly reports
+/// come from Cloud Functions after check-ins, same as any other account.
 class DemoBootstrap {
   static const _helperAppName = 'demo-helper';
 

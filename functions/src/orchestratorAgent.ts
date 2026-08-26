@@ -12,7 +12,7 @@ import { createChatAnthropic } from './anthropic';
 import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import { CheckInLoader, loadCheckIns } from './checkInLoader';
-import { assessRisk } from './riskModel';
+import { assessRisk, RiskLevel } from './riskModel';
 import {
   buildRecommendation,
   recommendationOptions,
@@ -20,14 +20,22 @@ import {
   SportGroup,
 } from './recommendationEngine';
 import { invokeOrchestratorTool, ORCHESTRATOR_TOOL_DEFS } from './orchestratorTools';
+import {
+  MEDICAL_DISCLAIMER,
+  RISK_OVERRIDES_PERFORMANCE_CLAUSE,
+  TOOL_GROUNDING_INSTRUCTION,
+} from './promptFragments';
+import { logGuardrailFallback, parseOrchestratorOutput } from './llmGuardrails';
+import { classifyOrchestratorFallback } from './langsmithPrivacy';
+import { traceOrchestratorToLangSmith } from './langsmithDevTrace';
 
 export const ORCHESTRATOR_SYSTEM_PROMPT = `You are AthleteIQ's Orchestrator. You decide the training recommendation a coach will review.
 
-HARD SAFETY CONSTRAINT (never violate):
-- Protecting the athlete comes first.
-- If there is genuine ambiguity OR elevated risk (MEDIUM or HIGH), prioritize athlete safety over performance optimization. Never the reverse.
-- A strong performance prediction must not override a MEDIUM or HIGH risk call. You may acknowledge that performance looks good, but the action must still reduce load or intensity.
-- Only recommend "continue training as planned" when risk is LOW and there is no serious ambiguity in the signals.
+${RISK_OVERRIDES_PERFORMANCE_CLAUSE}
+
+${MEDICAL_DISCLAIMER}
+
+${TOOL_GROUNDING_INSTRUCTION}
 
 How to work:
 1. Call getRiskAssessment and getPerformancePrediction. Call getAthleteHistory if the summaries are thin or conflicting.
@@ -57,22 +65,6 @@ export interface OrchestratorResult {
   trace: OrchestratorTraceStep[];
 }
 
-function parseAgentJson(raw: string): { action?: string; orchestratorNote?: string; why?: string } | null {
-  const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  if (start === -1 || end <= start) return null;
-  try {
-    return JSON.parse(trimmed.slice(start, end + 1)) as {
-      action?: string;
-      orchestratorNote?: string;
-      why?: string;
-    };
-  } catch {
-    return null;
-  }
-}
-
 function messageText(content: unknown): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
@@ -89,14 +81,56 @@ function messageText(content: unknown): string {
   return String(content ?? '');
 }
 
-function looksLikeFullTraining(action: string): boolean {
-  const a = action.toLowerCase();
-  return (
-    a.includes('continue training as planned') ||
-    a.includes('train as planned') ||
-    a.includes('full intensity') ||
-    a.includes('no change')
-  );
+/**
+ * Zod + business-rule gate for an Orchestrator JSON reply. On any failure,
+ * returns the same rules_fallback result used when the API is down.
+ */
+export function applyOrchestratorLlmResponse(
+  raw: string,
+  opts: {
+    allowedActions: string[];
+    riskLevel: RiskLevel;
+    ruleBased: Recommendation;
+    trace: OrchestratorTraceStep[];
+  },
+): OrchestratorResult {
+  const fallback = (reason: string): OrchestratorResult => {
+    logGuardrailFallback('orchestrator', reason);
+    return {
+      action: opts.ruleBased.action,
+      orchestratorNote: opts.ruleBased.orchestratorNote,
+      source: 'rules_fallback',
+      safetyOverride: false,
+      ruleBased: opts.ruleBased,
+      agreedWithRules: true,
+      trace: [...opts.trace, { order: opts.trace.length + 1, type: 'decision', why: reason }],
+    };
+  };
+
+  const parsed = parseOrchestratorOutput(raw, {
+    allowedActions: opts.allowedActions,
+    riskLevel: opts.riskLevel,
+  });
+  if (!parsed.ok) {
+    return fallback(`Agent output rejected (${parsed.reason}) — used rule-based Orchestrator.`);
+  }
+
+  return {
+    action: parsed.data.action,
+    orchestratorNote: parsed.data.orchestratorNote,
+    source: 'agent',
+    safetyOverride: false,
+    ruleBased: opts.ruleBased,
+    agreedWithRules: parsed.data.action === opts.ruleBased.action,
+    trace: [
+      ...opts.trace,
+      {
+        order: opts.trace.length + 1,
+        type: 'decision',
+        why: parsed.data.why ?? parsed.data.orchestratorNote,
+      },
+    ],
+  };
 }
 
 export async function runOrchestratorAgent(opts: {
@@ -105,10 +139,16 @@ export async function runOrchestratorAgent(opts: {
   defaultActionPercent?: number;
   loadEntries?: CheckInLoader;
   persistTrace?: boolean;
+  asOf?: string;
 }): Promise<OrchestratorResult> {
+  const started = Date.now();
+  let llmLatencyMs = 0;
+  let llmRoundtrips = 0;
+  const toolCalls: { tool: string; ok: boolean; latencyMs: number }[] = [];
+
   const loadEntries = opts.loadEntries ?? loadCheckIns;
   const entries = await loadEntries(opts.athleteUid, 35);
-  const assessment = assessRisk(entries, opts.sportGroup);
+  const assessment = assessRisk(entries, opts.sportGroup, opts.asOf);
   const pct = opts.defaultActionPercent;
   const ruleBased = buildRecommendation(
     assessment.riskLevel,
@@ -132,12 +172,36 @@ export async function runOrchestratorAgent(opts: {
     ],
   });
 
+  const finish = async (result: OrchestratorResult): Promise<OrchestratorResult> => {
+    const lastWhy = result.trace[result.trace.length - 1]?.why;
+    const classified = classifyOrchestratorFallback(
+      result.source === 'rules_fallback' ? lastWhy : undefined,
+    );
+    await traceOrchestratorToLangSmith({
+      surface: 'orchestrator',
+      privacy: 'redacted_no_phi',
+      sportGroup: opts.sportGroup,
+      toolCalls,
+      llmRoundtrips,
+      llmLatencyMs,
+      totalLatencyMs: Date.now() - started,
+      schemaValidationFailed: classified.schemaValidationFailed,
+      schemaFailureReason: classified.schemaFailureReason,
+      fallbackTriggered: result.source === 'rules_fallback',
+      fallbackReason:
+        result.source === 'rules_fallback' ? classified.fallbackReason : null,
+      source: result.source,
+      agreedWithRules: result.agreedWithRules,
+    });
+    return result;
+  };
+
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) {
-    return fallback([], 'ANTHROPIC_API_KEY missing — used rule-based Orchestrator.');
+    return finish(fallback([], 'ANTHROPIC_API_KEY missing — used rule-based Orchestrator.'));
   }
   if (entries.length < 5) {
-    return fallback([], 'Fewer than 5 check-ins — used rule-based Orchestrator.');
+    return finish(fallback([], 'Fewer than 5 check-ins — used rule-based Orchestrator.'));
   }
 
   const model = createChatAnthropic({
@@ -164,61 +228,43 @@ export async function runOrchestratorAgent(opts: {
 
   try {
     for (let i = 0; i < 6; i++) {
+      const llmStart = Date.now();
       const response = await model.invoke(messages);
+      llmLatencyMs += Date.now() - llmStart;
+      llmRoundtrips += 1;
       messages.push(response);
       const calls = response.tool_calls ?? [];
       if (calls.length === 0) {
-        const parsed = parseAgentJson(messageText(response.content));
-        if (!parsed?.action || !parsed.orchestratorNote) {
-          const result = fallback(trace, 'Agent output was not valid JSON — used rule-based Orchestrator.');
-          if (opts.persistTrace !== false) await persistTrace(opts.athleteUid, result);
-          return result;
-        }
-
-        let action = parsed.action.trim();
-        if (!allowed.includes(action)) {
-          const match = allowed.find((a) => a.toLowerCase() === action.toLowerCase());
-          action = match ?? ruleBased.action;
-        }
-
-        let safetyOverride = false;
-        if (
-          (assessment.riskLevel === 'HIGH' || assessment.riskLevel === 'MEDIUM') &&
-          looksLikeFullTraining(action)
-        ) {
-          safetyOverride = true;
-          action = ruleBased.action;
-        }
-
-        const decided: OrchestratorResult = {
-          action,
-          orchestratorNote: safetyOverride
-            ? `${parsed.orchestratorNote} [Safety override: elevated risk cannot yield a full-training plan.]`
-            : parsed.orchestratorNote,
-          source: 'agent',
-          safetyOverride,
+        const decided = applyOrchestratorLlmResponse(messageText(response.content), {
+          allowedActions: allowed,
+          riskLevel: assessment.riskLevel,
           ruleBased,
-          agreedWithRules: action === ruleBased.action,
-          trace: [
-            ...trace,
-            {
-              order: trace.length + 1,
-              type: 'decision',
-              why: parsed.why ?? parsed.orchestratorNote,
-            },
-          ],
-        };
-
+          trace,
+        });
         if (opts.persistTrace !== false) await persistTrace(opts.athleteUid, decided);
-        return decided;
+        return finish(decided);
       }
 
       for (const call of calls) {
-        const output = await invokeOrchestratorTool(
-          call.name,
-          (call.args ?? {}) as Record<string, unknown>,
-          loadEntries,
-        );
+        const toolStart = Date.now();
+        let ok = true;
+        let output: string;
+        try {
+          output = await invokeOrchestratorTool(
+            call.name,
+            (call.args ?? {}) as Record<string, unknown>,
+            loadEntries,
+            opts.athleteUid,
+          );
+        } catch {
+          ok = false;
+          output = JSON.stringify({ error: 'tool_failed' });
+        }
+        toolCalls.push({
+          tool: call.name,
+          ok,
+          latencyMs: Date.now() - toolStart,
+        });
         trace.push({
           order: trace.length + 1,
           type: 'tool',
@@ -238,12 +284,12 @@ export async function runOrchestratorAgent(opts: {
 
     const result = fallback(trace, 'Agent hit the tool-call limit — used rule-based Orchestrator.');
     if (opts.persistTrace !== false) await persistTrace(opts.athleteUid, result);
-    return result;
+    return finish(result);
   } catch (err) {
     logger.error('orchestrator agent failed', err);
     const result = fallback(trace, `Agent error: ${err instanceof Error ? err.message : String(err)}`);
     if (opts.persistTrace !== false) await persistTrace(opts.athleteUid, result);
-    return result;
+    return finish(result);
   }
 }
 

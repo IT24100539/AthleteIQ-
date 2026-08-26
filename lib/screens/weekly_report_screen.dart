@@ -338,12 +338,18 @@ class _ReportRow extends StatelessWidget {
               style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: valueColor ?? AppColors.textPrimary,
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: valueColor ?? AppColors.textPrimary,
+              ),
             ),
           ),
         ],

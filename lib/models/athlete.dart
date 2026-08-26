@@ -127,8 +127,9 @@ class AthleteProfile {
   final DateTime createdAt;
   final String deviceTier; // 'tier1' | 'tier2' | 'tier3'
 
-  /// Tier 3 has no wearable — resting HR may be entered on the daily check-in.
-  /// Tier 1/2 get it from the device, so the manual field stays hidden.
+  /// Tier 3 has no wearable — resting HR and HRV may be entered on the
+  /// daily check-in. Tier 1/2 get those from the device, so the manual
+  /// fields stay hidden.
   bool get allowsManualRestingHr =>
       deviceTier != 'tier1' && deviceTier != 'tier2';
   final bool deviceSetupCompleted;

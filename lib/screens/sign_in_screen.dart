@@ -1,8 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../dev/demo_accounts.dart';
-import '../dev/demo_seed.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import 'onboarding_screen.dart';
@@ -97,23 +94,6 @@ class _SignInScreenState extends State<SignInScreen> {
     }
   }
 
-  Future<void> _signInDemo(String role) async {
-    setState(() {
-      _loading = true;
-      _error = null;
-      _role = role;
-      _isSignUp = false;
-    });
-    try {
-      await DemoBootstrap.ensureAccountsAndData(signInAs: role);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
   // NEW: routes a new user through the onboarding intro slides before
   // flipping the form into sign-up mode. Existing users toggling back
   // to sign-in skip straight there — no onboarding needed.
@@ -142,9 +122,11 @@ class _SignInScreenState extends State<SignInScreen> {
     final isAthlete = _role == 'athlete';
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.symmetric(horizontal: 28),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -316,37 +298,6 @@ class _SignInScreenState extends State<SignInScreen> {
                         fontWeight: FontWeight.w600),
                   ),
                 ),
-                if (kDebugMode) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Debug demo · ${DemoAccounts.password}',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 11,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton(
-                    onPressed: _loading ? null : () => _signInDemo('athlete'),
-                    child: const Text('Open demo athlete'),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton(
-                    onPressed: _loading ? null : () => _signInDemo('coach'),
-                    child: const Text('Open demo coach'),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${DemoAccounts.athleteEmail}\n${DemoAccounts.coachEmail}',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 11,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 16),
               ],
             ),
@@ -391,13 +342,17 @@ class _RoleTab extends StatelessWidget {
               color: selected ? AppColors.mintDark : AppColors.textMuted,
             ),
             const SizedBox(width: 6),
-            Text(
+            Flexible(
+              child: Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: selected ? AppColors.mintDark : AppColors.textSecondary,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 fontSize: 13,
               ),
+            ),
             ),
           ],
         ),

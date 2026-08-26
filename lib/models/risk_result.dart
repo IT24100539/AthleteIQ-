@@ -16,6 +16,8 @@ class RiskResult {
   final String? performanceReasoningLLM;
   final String recommendation;
   final String? recommendationStatus; // pending | approved | rejected | modified
+  final String? reviewedBy;
+  final String? reviewedAt;
   final List<GradedOption> gradedOptions;
   final String? researchNote;
   final List<ResearchCitation> researchCitations;
@@ -45,6 +47,8 @@ class RiskResult {
     this.performanceReasoningLLM,
     required this.recommendation,
     this.recommendationStatus,
+    this.reviewedBy,
+    this.reviewedAt,
     this.gradedOptions = const [],
     this.researchNote,
     this.researchCitations = const [],
@@ -91,6 +95,8 @@ class RiskResult {
         performanceReasoningLLM: map['performanceReasoningLLM'] as String?,
         recommendation: map['recommendation'] ?? '',
         recommendationStatus: map['recommendationStatus'],
+        reviewedBy: map['reviewedBy'] as String?,
+        reviewedAt: map['reviewedAt'] as String?,
         gradedOptions: _parseGradedOptions(map['gradedOptions']),
         researchNote: map['researchNote'] as String?,
         researchCitations: _parseCitations(map['researchCitations']),

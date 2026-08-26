@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../utils/privacy_redaction.dart';
 import '../utils/risk_signals.dart';
 import '../widgets/async_body.dart';
+import '../widgets/responsive_chart_frame.dart';
 import '../widgets/risk_chip.dart';
 import '../widgets/stat_card.dart';
 import 'not_enough_data_screen.dart';
@@ -25,7 +26,11 @@ class InjuryRiskScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Risk detail · ${athlete.name}'),
+        title: Text(
+          'Risk detail · ${athlete.name}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         centerTitle: true,
       ),
       body: StreamBuilder<RiskResult?>(
@@ -275,16 +280,12 @@ class _AcwrLineChart extends StatelessWidget {
     final maxY = (maxAcwr < 1.8 ? 1.8 : maxAcwr + 0.2).clamp(1.8, 3.0);
     final dateFmt = DateFormat('M/d');
 
-    return RepaintBoundary(
-      child: Container(
-      height: 260,
-      padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: LineChart(
+    return ResponsiveChartFrame(
+      maxHeight: 260,
+      minHeight: 160,
+      builder: (context, size) {
+        final reservedLeft = ResponsiveChartFrame.leftTitleSize(size.width);
+        return LineChart(
         LineChartData(
           minY: 0,
           maxY: maxY.toDouble(),
@@ -340,7 +341,7 @@ class _AcwrLineChart extends StatelessWidget {
                   show: true,
                   alignment: Alignment.topRight,
                   style: const TextStyle(fontSize: 9, color: AppColors.coral),
-                  labelResolver: (_) => '1.5 danger',
+                  labelResolver: (_) => size.width < 360 ? '1.5' : '1.5 danger',
                 ),
               ),
             ],
@@ -361,7 +362,7 @@ class _AcwrLineChart extends StatelessWidget {
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 36,
+                reservedSize: reservedLeft,
                 interval: 0.5,
                 getTitlesWidget: (value, meta) => Text(
                   value.toStringAsFixed(1),
@@ -408,8 +409,8 @@ class _AcwrLineChart extends StatelessWidget {
           ],
         ),
         duration: Duration.zero,
-      ),
-    ),
+      );
+      },
     );
   }
 }
@@ -429,16 +430,13 @@ class _FatigueLineChart extends StatelessWidget {
     ];
     final dateFmt = DateFormat('M/d');
 
-    return RepaintBoundary(
-      child: Container(
-      height: 160,
-      padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: LineChart(
+    return ResponsiveChartFrame(
+      maxHeight: 180,
+      minHeight: 130,
+      heightFactor: 0.5,
+      builder: (context, size) {
+        final reservedLeft = ResponsiveChartFrame.leftTitleSize(size.width, wide: 22, narrow: 18);
+        return LineChart(
         LineChartData(
           minY: 1,
           maxY: 5,
@@ -476,7 +474,7 @@ class _FatigueLineChart extends StatelessWidget {
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 22,
+                reservedSize: reservedLeft,
                 interval: 1,
                 getTitlesWidget: (value, meta) => Text(
                   value.toInt().toString(),
@@ -511,8 +509,8 @@ class _FatigueLineChart extends StatelessWidget {
           ],
         ),
         duration: Duration.zero,
-      ),
-    ),
+      );
+      },
     );
   }
 }

@@ -23,7 +23,13 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { logger } from 'firebase-functions';
 import { createChatAnthropic } from './anthropic';
 import { DailyEntry } from './calculations';
+import {
+  GROUNDING_INSTRUCTION,
+  jsonExampleForChatPrompt,
+  MISSING_METRIC_DISCLOSE,
+} from './promptFragments';
 import { RiskAssessment } from './riskModel';
+import { logGuardrailFallback, parseExplainOutput } from './llmGuardrails';
 
 export interface ExplainabilityLlmResult {
   riskLevelReasoningLLM: string;
@@ -32,18 +38,17 @@ export interface ExplainabilityLlmResult {
   source: 'llm' | 'rules';
 }
 
-/** Literal JSON uses doubled braces so ChatPromptTemplate does not treat keys as variables. */
-const EXPLAIN_PROMPT = `You are AthleteIQ's explainability writer (Sections 13.4 / 14.5). A rule-based engine has ALREADY classified this athlete. You do not classify. You explain.
+export const EXPLAIN_PROMPT = `You are AthleteIQ's explainability writer (Sections 13.4 / 14.5). A rule-based engine has ALREADY classified this athlete. You do not classify. You explain.
 
 Hard rules:
 - The locked riskLevel and performancePrediction below are final. Do not contradict, upgrade, or downgrade them.
 - Phrase performance in the sport-group framing given (time/pace, coach-rated readiness, max output, match + readiness, or readiness + sparring). Do not invent a different metric.
-- Ground every claim in the provided numbers and the last 5 check-in days. Do not invent metrics.
+- ${GROUNDING_INSTRUCTION} Ground every claim in the provided numbers and the last 5 check-in days. ${MISSING_METRIC_DISCLOSE}
 - riskLevelReasoningLLM: 2–3 sentences that walk through the multi-day trend (load, sleep, fatigue, HRV if present) and why it matches the locked riskLevel.
 - riskLevelPatternFlag: null unless the last 5 days show a pattern a coach should glance at (e.g. sleep collapsing while load climbs, fatigue stuck high, HRV dropping). If you flag, start with "Worth a closer look:" and one sentence. This is a note, not a new risk level.
 - performanceReasoningLLM: 1–2 interpretive sentences about the locked performance prediction. This one may be more narrative because it is not a safety flag.
 - Return JSON only, no markdown:
-{{"riskLevelReasoningLLM":"...","riskLevelPatternFlag":null,"performanceReasoningLLM":"..."}}`;
+${jsonExampleForChatPrompt('{"riskLevelReasoningLLM":"...","riskLevelPatternFlag":null,"performanceReasoningLLM":"..."}')}`;
 
 function formatLast5(entriesRecentFirst: DailyEntry[]): string {
   const last5 = entriesRecentFirst.slice(0, 5);
@@ -68,39 +73,21 @@ function fallbackExplanation(assessment: RiskAssessment): ExplainabilityLlmResul
   };
 }
 
-function parseExplainJson(raw: string): Omit<ExplainabilityLlmResult, 'source'> | null {
-  const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  if (start === -1 || end <= start) return null;
-  try {
-    const parsed = JSON.parse(trimmed.slice(start, end + 1)) as {
-      riskLevelReasoningLLM?: unknown;
-      riskLevelPatternFlag?: unknown;
-      performanceReasoningLLM?: unknown;
-    };
-    const riskText =
-      typeof parsed.riskLevelReasoningLLM === 'string'
-        ? parsed.riskLevelReasoningLLM.trim()
-        : '';
-    const perfText =
-      typeof parsed.performanceReasoningLLM === 'string'
-        ? parsed.performanceReasoningLLM.trim()
-        : '';
-    if (!riskText || !perfText) return null;
-    const flagRaw = parsed.riskLevelPatternFlag;
-    const flag =
-      typeof flagRaw === 'string' && flagRaw.trim() && flagRaw.trim().toLowerCase() !== 'null'
-        ? flagRaw.trim()
-        : null;
-    return {
-      riskLevelReasoningLLM: riskText,
-      riskLevelPatternFlag: flag,
-      performanceReasoningLLM: perfText,
-    };
-  } catch {
-    return null;
+/**
+ * Schema + locked-risk check. Extra `riskLevel` fields or prose that
+ * reclassifies the locked band discard the LLM output.
+ */
+export function applyExplainLlmResponse(
+  raw: string,
+  assessment: RiskAssessment,
+): ExplainabilityLlmResult {
+  const fallback = fallbackExplanation(assessment);
+  const parsed = parseExplainOutput(raw, { lockedRiskLevel: assessment.riskLevel });
+  if (!parsed.ok) {
+    logGuardrailFallback('explain', parsed.reason);
+    return fallback;
   }
+  return { ...parsed.data, source: 'llm' };
 }
 
 /**
@@ -138,12 +125,7 @@ export async function enrichAssessmentExplanation(
     ]);
     const chain = prompt.pipe(model).pipe(new StringOutputParser());
     const raw = await chain.invoke({ context });
-    const parsed = parseExplainJson(raw);
-    if (!parsed) {
-      logger.warn('explainability LLM: invalid JSON, using rule-based reason');
-      return fallback;
-    }
-    return { ...parsed, source: 'llm' };
+    return applyExplainLlmResponse(raw, assessment);
   } catch (err) {
     logger.warn('explainability LLM failed; using rule-based reason', err);
     return fallback;

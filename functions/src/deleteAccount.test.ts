@@ -13,6 +13,7 @@ describe('account deletion coverage', () => {
       'checkins',
       'checkinsCoachView',
       'devices',
+      'llmEvaluations',
       'messages',
       'orchestratorTraces',
       'painReports',

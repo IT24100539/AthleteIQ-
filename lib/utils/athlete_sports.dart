@@ -11,17 +11,17 @@ export '../models/athlete.dart' show
 String rpePromptForGroup(SportGroup group) {
   switch (group) {
     case SportGroup.endurance:
-      return 'How hard did that session feel? (RPE)';
+      return 'How hard did that session feel?';
     case SportGroup.teamContact:
-      return 'How hard did training or the match feel? (RPE)';
+      return 'How hard did training or the match feel?';
     case SportGroup.strengthPower:
-      return 'How hard did the lifts feel? (RPE)';
+      return 'How hard did the lifts feel?';
     case SportGroup.skillPrecision:
-      return 'How hard did practice or match play feel? (RPE)';
+      return 'How hard did practice or match play feel?';
     case SportGroup.combat:
-      return 'How hard did drilling or sparring feel? (RPE)';
+      return 'How hard did drilling or sparring feel?';
     case SportGroup.other:
-      return 'How hard did that session feel? (RPE)';
+      return 'How hard did that session feel?';
   }
 }
 

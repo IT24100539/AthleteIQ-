@@ -12,6 +12,8 @@ const FUNCTIONS = [
   { name: 'classifyCustomSport', region: 'us-central1' },
   { name: 'submitPainReport', region: 'us-central1' },
   { name: 'getWeeklyReport', region: 'us-central1' },
+  { name: 'evaluateLlmOutput', region: 'us-central1' },
+  { name: 'evaluateAthleteLlmHistory', region: 'us-central1' },
   { name: 'resyncCheckInCoachViews', region: 'us-central1' },
   { name: 'onCheckInWritten', region: 'asia-south1' },
 ];

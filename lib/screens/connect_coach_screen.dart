@@ -269,8 +269,11 @@ class CoachInviteCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              Text(
+              Flexible(
+                child: Text(
                 inviteCode!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
@@ -278,7 +281,7 @@ class CoachInviteCard extends StatelessWidget {
                   letterSpacing: 2,
                 ),
               ),
-              const Spacer(),
+              ),
               IconButton(
                 icon: const Icon(Icons.copy, size: 18),
                 onPressed: onCopy,

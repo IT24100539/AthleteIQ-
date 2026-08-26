@@ -18,15 +18,34 @@ functions/.secret.local
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+*.log
+
+# Python bytecode / virtualenvs (including archived prototype)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # Secrets — never commit service account keys
-MODEL/athleteiq-risk-engine/serviceAccountKey.json
+MODEL_prototype_do_not_use/athleteiq-risk-engine/serviceAccountKey.json
 *.json.key
 
-# IDE
+# IDE / OS
 .idea/
 *.iml
 .vscode/
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+*.lcov
 
 # Do NOT commit real Firebase secrets/config if you make this repo public
 # lib/firebase_options.dart is usually fine to commit (it's not a secret,

@@ -14,7 +14,14 @@ import {
   LOW_DECLINING_ACTION,
   SportGroup,
 } from './recommendationEngine';
-import { RiskAssessment, RiskLevel } from './riskModel';
+import {
+  GROUNDING_INSTRUCTION,
+  jsonExampleForChatPrompt,
+  MEDICAL_DISCLAIMER,
+  RISK_OVERRIDES_PERFORMANCE_CLAUSE,
+} from './promptFragments';
+import { RiskAssessment } from './riskModel';
+import { logGuardrailFallback, parseGradedOutput } from './llmGuardrails';
 
 export type GradedOptionTier = 'Conservative' | 'Moderate' | 'Minimal change';
 
@@ -29,8 +36,7 @@ export interface GradedOptionsResult {
   source: 'llm' | 'rules';
 }
 
-/** Literal JSON uses doubled braces so ChatPromptTemplate does not treat keys as variables. */
-const GRADED_PROMPT = `You are AthleteIQ's recommendation writer (Section 16.3). Given an athlete's risk signals and sport, produce exactly 3 graded training options for a coach to choose from.
+export const GRADED_PROMPT = `You are AthleteIQ's recommendation writer (Section 16.3). Given an athlete's risk signals and sport, produce exactly 3 graded training options for a coach to choose from.
 
 Tiers (always use these exact labels):
 1. Conservative — maximum load reduction; safest choice when risk is elevated.
@@ -40,63 +46,12 @@ Tiers (always use these exact labels):
 Rules:
 - Each option needs a one-line "reason" (max 20 words).
 - Wording must fit the sport group provided.
-- If risk is HIGH or MEDIUM, Minimal change must NOT be full unrestricted training — never "train as hard as planned" when risk is elevated.
+- ${GROUNDING_INSTRUCTION}
+- ${RISK_OVERRIDES_PERFORMANCE_CLAUSE}
+- ${MEDICAL_DISCLAIMER}
 - If risk is LOW, Minimal change may be "continue as planned".
 - Return JSON only, no markdown:
-{{"options":[{{"tier":"Conservative","action":"...","reason":"..."}},{{"tier":"Moderate","action":"...","reason":"..."}},{{"tier":"Minimal change","action":"...","reason":"..."}}]}}`;
-
-function parseGradedJson(raw: string): GradedOption[] | null {
-  const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  if (start === -1 || end <= start) return null;
-  try {
-    const parsed = JSON.parse(trimmed.slice(start, end + 1)) as { options?: GradedOption[] };
-    if (!Array.isArray(parsed.options) || parsed.options.length < 2) return null;
-    const validTiers: GradedOptionTier[] = ['Conservative', 'Moderate', 'Minimal change'];
-    const options = parsed.options
-      .filter(
-        (o) =>
-          o &&
-          validTiers.includes(o.tier as GradedOptionTier) &&
-          typeof o.action === 'string' &&
-          typeof o.reason === 'string',
-      )
-      .slice(0, 3)
-      .map((o) => ({
-        tier: o.tier as GradedOptionTier,
-        action: o.action.trim(),
-        reason: o.reason.trim(),
-      }));
-    return options.length >= 2 ? options : null;
-  } catch {
-    return null;
-  }
-}
-
-function looksLikeFullTraining(action: string): boolean {
-  const a = action.toLowerCase();
-  return a.includes('continue training as planned') || a.includes('train as planned');
-}
-
-function enforceSafety(
-  options: GradedOption[],
-  riskLevel: RiskLevel,
-  templates: ReturnType<typeof buildSportTemplates>,
-): GradedOption[] {
-  if (riskLevel !== 'HIGH' && riskLevel !== 'MEDIUM') return options;
-  return options.map((o) => {
-    if (o.tier === 'Minimal change' && looksLikeFullTraining(o.action)) {
-      const template = templates.other;
-      return {
-        ...o,
-        action: template.MEDIUM,
-        reason: `${o.reason} (adjusted: elevated risk cannot allow full training.)`,
-      };
-    }
-    return o;
-  });
-}
+${jsonExampleForChatPrompt('{"options":[{"tier":"Conservative","action":"...","reason":"..."},{"tier":"Moderate","action":"...","reason":"..."},{"tier":"Minimal change","action":"...","reason":"..."}]}')}`;
 
 /** Rule-based fallback when the LLM is unavailable. */
 export function fallbackGradedOptions(
@@ -188,6 +143,36 @@ export function fallbackGradedOptions(
   ];
 }
 
+/**
+ * Schema + business-rule gate. Malformed JSON or a full-training plan
+ * when risk is MEDIUM/HIGH discards the LLM output entirely.
+ */
+export function applyGradedLlmResponse(
+  raw: string,
+  opts: {
+    assessment: RiskAssessment;
+    sportGroup: SportGroup;
+    primaryAction: string;
+    defaultActionPercent?: number;
+  },
+  fallback: () => GradedOptionsResult = () => ({
+    options: fallbackGradedOptions(
+      opts.assessment,
+      opts.sportGroup,
+      opts.primaryAction,
+      opts.defaultActionPercent,
+    ),
+    source: 'rules',
+  }),
+): GradedOptionsResult {
+  const parsed = parseGradedOutput(raw, { riskLevel: opts.assessment.riskLevel });
+  if (!parsed.ok) {
+    logGuardrailFallback('graded', parsed.reason);
+    return fallback();
+  }
+  return { options: parsed.data.options, source: 'llm' };
+}
+
 export async function generateGradedOptions(opts: {
   assessment: RiskAssessment;
   sportGroup: SportGroup;
@@ -196,7 +181,6 @@ export async function generateGradedOptions(opts: {
   primaryNote: string;
   defaultActionPercent?: number;
 }): Promise<GradedOptionsResult> {
-  const templates = buildSportTemplates(opts.defaultActionPercent);
   const fallback = (): GradedOptionsResult => ({
     options: fallbackGradedOptions(
       opts.assessment,
@@ -232,15 +216,7 @@ export async function generateGradedOptions(opts: {
     ]);
     const chain = prompt.pipe(model).pipe(new StringOutputParser());
     const raw = await chain.invoke({ context });
-    const parsed = parseGradedJson(raw);
-    if (!parsed) {
-      logger.warn('graded options: invalid LLM JSON, using rules fallback');
-      return fallback();
-    }
-    return {
-      options: enforceSafety(parsed, opts.assessment.riskLevel, templates),
-      source: 'llm',
-    };
+    return applyGradedLlmResponse(raw, opts, fallback);
   } catch (err) {
     logger.error('graded options LLM failed', err);
     return fallback();

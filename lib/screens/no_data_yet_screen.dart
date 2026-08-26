@@ -14,19 +14,28 @@ class NoDataYetScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: EmptyState(
-        icon: Icons.show_chart_rounded,
-        heading: 'No data yet',
-        subtext:
-            'Start with a check-in (how you felt and what you trained) or connect '
-            'a wearable for sleep and heart rate. AthleteIQ will not invent a '
-            'forecast until you have logged days.',
-        actionLabel: 'Log a check-in',
-        onAction: onLogCheckIn,
-        secondaryActionLabel: 'Connect a device',
-        onSecondaryAction: onConnectDevice,
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: EmptyState(
+                icon: Icons.show_chart_rounded,
+                heading: 'No data yet',
+                subtext:
+                    'Start with a check-in (how you felt and what you trained) or connect '
+                    'a wearable for sleep and heart rate. AthleteIQ will not invent a '
+                    'forecast until you have logged days.',
+                actionLabel: 'Log a check-in',
+                onAction: onLogCheckIn,
+                secondaryActionLabel: 'Connect a device',
+                onSecondaryAction: onConnectDevice,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

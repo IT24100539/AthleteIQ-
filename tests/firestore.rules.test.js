@@ -169,6 +169,13 @@ async function seedBaseData() {
       action: 'reduce_volume',
       timestamp: '2026-08-14T12:00:00.000Z',
     });
+
+    await db.doc(`athletes/${ATHLETE_A}/llmEvaluations/eval-1`).set({
+      kind: 'askAthleteIQ',
+      overallScore: 4,
+      overallPass: true,
+      judgedAt: '2026-08-14T12:00:00.000Z',
+    });
   });
 }
 
@@ -944,13 +951,14 @@ async function main() {
     await assertFails(db.doc(latestPath).get());
   });
 
-  await test('coach can approve by updating status, recommendation, reviewedAt', async () => {
+  await test('coach can approve by updating status, recommendation, reviewedAt, reviewedBy', async () => {
     await seedLatest();
     const db = testEnv.authenticatedContext(COACH_C).firestore();
     await assertSucceeds(
       db.doc(latestPath).update({
         recommendationStatus: 'approved',
         reviewedAt: '2026-08-15T12:00:00.000Z',
+        reviewedBy: COACH_C,
       }),
     );
   });
@@ -963,6 +971,30 @@ async function main() {
         recommendationStatus: 'modified',
         recommendation: 'Swim 30 min easy',
         reviewedAt: '2026-08-15T12:00:00.000Z',
+        reviewedBy: COACH_C,
+      }),
+    );
+  });
+
+  await test('coach CANNOT approve without reviewedBy matching their uid', async () => {
+    await seedLatest();
+    const db = testEnv.authenticatedContext(COACH_C).firestore();
+    await assertFails(
+      db.doc(latestPath).update({
+        recommendationStatus: 'approved',
+        reviewedAt: '2026-08-15T12:00:00.000Z',
+      }),
+    );
+  });
+
+  await test('coach CANNOT stamp reviewedBy as another uid', async () => {
+    await seedLatest();
+    const db = testEnv.authenticatedContext(COACH_C).firestore();
+    await assertFails(
+      db.doc(latestPath).update({
+        recommendationStatus: 'approved',
+        reviewedAt: '2026-08-15T12:00:00.000Z',
+        reviewedBy: COACH_D,
       }),
     );
   });
@@ -974,6 +1006,7 @@ async function main() {
       db.doc(latestPath).update({
         recommendationStatus: 'approved',
         reviewedAt: '2026-08-15T12:00:00.000Z',
+        reviewedBy: ATHLETE_A,
       }),
     );
   });
@@ -1016,6 +1049,81 @@ async function main() {
     await assertFails(
       db.doc(`athletes/${ATHLETE_A}/orchestratorTraces/fake`).set({
         action: 'fake',
+      }),
+    );
+  });
+
+  // --- llmEvaluations ---
+
+  await test('athlete and assigned coach can read llmEvaluations', async () => {
+    const athlete = testEnv.authenticatedContext(ATHLETE_A).firestore();
+    const coach = testEnv.authenticatedContext(COACH_C).firestore();
+    await assertSucceeds(
+      athlete.doc(`athletes/${ATHLETE_A}/llmEvaluations/eval-1`).get(),
+    );
+    await assertSucceeds(
+      coach.doc(`athletes/${ATHLETE_A}/llmEvaluations/eval-1`).get(),
+    );
+  });
+
+  await test('other athlete CANNOT read llmEvaluations', async () => {
+    const db = testEnv.authenticatedContext(ATHLETE_B).firestore();
+    await assertFails(
+      db.doc(`athletes/${ATHLETE_A}/llmEvaluations/eval-1`).get(),
+    );
+  });
+
+  await test('client CANNOT write llmEvaluations', async () => {
+    const db = testEnv.authenticatedContext(ATHLETE_A).firestore();
+    await assertFails(
+      db.doc(`athletes/${ATHLETE_A}/llmEvaluations/fake`).set({
+        overallScore: 5,
+      }),
+    );
+  });
+
+  // --- NON-NEGOTIABLES (permanent regressions; names are the rule) ---
+
+  await test('NON-NEGOTIABLE: athlete cannot read another athlete profile', async () => {
+    const db = testEnv.authenticatedContext(ATHLETE_B).firestore();
+    await assertFails(db.collection('athletes').doc(ATHLETE_A).get());
+  });
+
+  await test('NON-NEGOTIABLE: athlete cannot read another athlete check-ins', async () => {
+    const db = testEnv.authenticatedContext(ATHLETE_B).firestore();
+    await assertFails(db.doc(checkInPath(ATHLETE_A)).get());
+  });
+
+  await test('NON-NEGOTIABLE: coach cannot read an athlete not on their roster (profile)', async () => {
+    const db = testEnv.authenticatedContext(COACH_D).firestore();
+    await assertFails(db.collection('athletes').doc(ATHLETE_A).get());
+  });
+
+  await test('NON-NEGOTIABLE: coach cannot read an athlete not on their roster (check-ins)', async () => {
+    const db = testEnv.authenticatedContext(COACH_D).firestore();
+    await assertFails(db.doc(checkInPath(ATHLETE_A)).get());
+  });
+
+  await test('NON-NEGOTIABLE: coach cannot read an athlete not on their roster (riskResults)', async () => {
+    await seedLatest();
+    const db = testEnv.authenticatedContext(COACH_D).firestore();
+    await assertFails(db.doc(latestPath).get());
+  });
+
+  await test('NON-NEGOTIABLE: pending recommendation on latest is not readable by the athlete', async () => {
+    await seedLatest();
+    const db = testEnv.authenticatedContext(ATHLETE_A).firestore();
+    await assertFails(db.doc(latestPath).get());
+  });
+
+  await test('NON-NEGOTIABLE: athlete cannot self-approve a recommendation', async () => {
+    await seedLatest();
+    const db = testEnv.authenticatedContext(ATHLETE_A).firestore();
+    await assertFails(
+      db.doc(latestPath).update({
+        recommendationStatus: 'approved',
+        reviewedAt: '2026-08-15T12:00:00.000Z',
+        reviewedBy: ATHLETE_A,
       }),
     );
   });

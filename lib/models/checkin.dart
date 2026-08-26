@@ -11,7 +11,7 @@ class CheckIn {
   final int fatigueScore; // 1-5, manual only, required daily
   final double? sleepHours; // manual or synced
   final double? restingHeartRate; // wearable (Tier 1/2) or optional manual (Tier 3)
-  final double? hrv; // synced only, Tier 1 — never entered by hand
+  final double? hrv; // wearable, or optional manual on Tier 3 — never invented
   final String? soreness; // free text, optional (roadmap: structured)
   final String source; // 'manual' | 'wearable' | 'import'
   /// Which of the athlete's sports this session was for (multi-sport).

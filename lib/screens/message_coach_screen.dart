@@ -164,18 +164,24 @@ class _MessageCoachScreenState extends State<MessageCoachScreen> {
                             ),
                     ),
                     const SizedBox(width: 10),
-                    Column(
+                    Expanded(
+                      child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           waitingProfile ? 'Loading…' : displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                         ),
                         Text(
                           hasCoach ? 'Your coach' : 'Link a coach in Profile',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                         ),
                       ],
+                    ),
                     ),
                   ],
                 ),

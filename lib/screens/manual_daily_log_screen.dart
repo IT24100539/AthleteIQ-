@@ -4,11 +4,16 @@ import 'package:flutter/material.dart';
 import '../models/athlete.dart';
 import '../models/checkin.dart';
 import '../services/firestore_service.dart';
+import '../constants/checkin_field_help.dart';
 import '../theme/app_theme.dart';
 import '../utils/athlete_sports.dart';
 import '../utils/friendly_error.dart';
 import '../utils/stream_fallback.dart';
+import '../widgets/info_tooltip.dart';
+import '../widgets/manual_resting_hr_field.dart';
 import '../widgets/session_sport_picker.dart';
+import '../widgets/word_scale_picker.dart';
+import '../constants/checkin_scale_labels.dart';
 
 class ManualDailyLogScreen extends StatefulWidget {
   final String athleteUid;
@@ -27,10 +32,13 @@ class _ManualDailyLogScreenState extends State<ManualDailyLogScreen> {
 
   bool _trainedToday = true;
   double _durationMinutes = 60;
-  double _rpe = 6.0;
+  int _rpe = 6;
   double _sleepHours = 7.0;
   int _fatigue = 3;
-  double _restingHr = 60;
+  bool _includeRhr = false;
+  double _restingHr = ManualRestingHrField.defaultBpm;
+  bool _includeHrv = false;
+  double _hrv = ManualHrvField.defaultMs;
   double _steps = 8000;
   String? _deviceTier;
   List<String> _sports = const [];
@@ -72,11 +80,13 @@ class _ManualDailyLogScreenState extends State<ManualDailyLogScreen> {
       final checkIn = CheckIn(
         id: '',
         date: DateTime.now(),
-        rpe: _trainedToday ? _rpe.round() : 0,
+        rpe: _trainedToday ? _rpe : 0,
         sessionDurationMinutes: _trainedToday ? _durationMinutes.round() : 0,
         sleepHours: _sleepHours,
         fatigueScore: _fatigue,
-        restingHeartRate: _isTier3 ? _restingHr.roundToDouble() : null,
+        restingHeartRate:
+            _isTier3 && _includeRhr ? _restingHr.roundToDouble() : null,
+        hrv: _isTier3 && _includeHrv ? _hrv.roundToDouble() : null,
         steps: _isTier3 ? _steps.round() : null,
         soreness: _sorenessController.text.trim().isEmpty
             ? null
@@ -121,13 +131,20 @@ class _ManualDailyLogScreenState extends State<ManualDailyLogScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: const Text('Log today'),
         centerTitle: true,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.screenEdge),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.screenEdge,
+            AppSpacing.screenEdge,
+            AppSpacing.screenEdge,
+            AppSpacing.screenEdge + 24,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -142,6 +159,7 @@ class _ManualDailyLogScreenState extends State<ManualDailyLogScreen> {
                 const SizedBox(height: 12),
                 _SliderField(
                   label: 'Sleep last night',
+                  infoText: CheckinFieldHelp.sleep,
                   value: _sleepHours,
                   min: 4,
                   max: 10,
@@ -149,28 +167,29 @@ class _ManualDailyLogScreenState extends State<ManualDailyLogScreen> {
                   display: '${_sleepHours.toStringAsFixed(1)} h',
                   onChanged: (v) => setState(() => _sleepHours = v),
                 ),
-                _SliderField(
-                  label: 'Resting heart rate (bpm)',
-                  value: _restingHr,
-                  min: 40,
-                  max: 110,
-                  divisions: 70,
-                  display: '${_restingHr.round()} bpm',
-                  onChanged: (v) => setState(() => _restingHr = v),
+                ManualRestingHrField(
+                  include: _includeRhr,
+                  bpm: _restingHr,
+                  onIncludeChanged: (v) => setState(() => _includeRhr = v),
+                  onBpmChanged: (v) => setState(() => _restingHr = v),
                 ),
+                const SizedBox(height: 16),
+                ManualHrvField(
+                  include: _includeHrv,
+                  ms: _hrv,
+                  onIncludeChanged: (v) => setState(() => _includeHrv = v),
+                  onMsChanged: (v) => setState(() => _hrv = v),
+                ),
+                const SizedBox(height: 16),
                 _SliderField(
                   label: 'Daily steps',
+                  infoText: CheckinFieldHelp.dailySteps,
                   value: _steps,
                   min: 0,
                   max: 25000,
                   divisions: 50,
                   display: '${_steps.round()} steps',
                   onChanged: (v) => setState(() => _steps = v),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'HRV requires a Tier 1 device (Apple Watch / Garmin) and cannot be entered manually.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.35),
                 ),
                 const SizedBox(height: 24),
                 const _SubsectionLabel('Training'),
@@ -215,6 +234,7 @@ class _ManualDailyLogScreenState extends State<ManualDailyLogScreen> {
               if (_trainedToday) ...[
                 _SliderField(
                   label: 'Session duration',
+                  infoText: CheckinFieldHelp.sessionDuration,
                   value: _durationMinutes,
                   min: 5,
                   max: 240,
@@ -222,24 +242,23 @@ class _ManualDailyLogScreenState extends State<ManualDailyLogScreen> {
                   display: '${_durationMinutes.round()} min',
                   onChanged: (v) => setState(() => _durationMinutes = v),
                 ),
-                _SliderField(
+                WordScalePicker(
                   label: rpePromptForGroup(groupForSession(
                     sports: _sports,
                     sportGroups: _sportGroups,
                     sessionSport: _sessionSport,
                   )),
+                  infoText: CheckinFieldHelp.rpe,
+                  choices: CheckinWordScales.rpe,
                   value: _rpe,
-                  min: 1,
-                  max: 10,
-                  divisions: 9,
-                  display: 'RPE ${_rpe.round()}',
-                  onChanged: (v) => setState(() => _rpe = v),
+                  onSelected: (v) => setState(() => _rpe = v),
                 ),
               ],
 
               if (!_isTier3) ...[
                 _SliderField(
                   label: 'Sleep last night',
+                  infoText: CheckinFieldHelp.sleep,
                   value: _sleepHours,
                   min: 4,
                   max: 10,
@@ -250,22 +269,17 @@ class _ManualDailyLogScreenState extends State<ManualDailyLogScreen> {
               ],
 
               const SizedBox(height: 8),
-              const _FieldLabel('Fatigue today (1 = fresh, 5 = exhausted)'),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [1, 2, 3, 4, 5].map((lvl) {
-                  return _OptionChip(
-                    label: '$lvl',
-                    selected: _fatigue == lvl,
-                    onTap: () => setState(() => _fatigue = lvl),
-                  );
-                }).toList(),
+              WordScalePicker(
+                label: 'How do you feel today?',
+                infoText: CheckinFieldHelp.fatigue,
+                choices: CheckinWordScales.fatigue,
+                value: _fatigue,
+                onSelected: (v) => setState(() => _fatigue = v),
               ),
-              const SizedBox(height: 24),
 
               TextField(
                 controller: _sorenessController,
+                scrollPadding: const EdgeInsets.only(bottom: 120),
                 decoration: const InputDecoration(
                   labelText: 'Soreness or pain notes (optional)',
                   hintText: 'e.g. tight calves, left knee niggle',
@@ -353,6 +367,7 @@ class _SubsectionLabel extends StatelessWidget {
 
 class _SliderField extends StatelessWidget {
   final String label;
+  final String? infoText;
   final double value;
   final double min;
   final double max;
@@ -362,6 +377,7 @@ class _SliderField extends StatelessWidget {
 
   const _SliderField({
     required this.label,
+    this.infoText,
     required this.value,
     required this.min,
     required this.max,
@@ -378,11 +394,12 @@ class _SliderField extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(
-                  label,
+                child: FieldLabelWithInfo(
+                  label: label,
+                  infoText: infoText,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -454,7 +471,7 @@ class _OptionChip extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
             decoration: BoxDecoration(
               color: selected ? AppColors.mint : AppColors.surface,
               borderRadius: BorderRadius.circular(AppRadius.chip),

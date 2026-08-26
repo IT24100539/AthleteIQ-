@@ -1,4 +1,4 @@
-/// Debug-only demo logins. Shown on the sign-in screen in [kDebugMode].
+/// Debug-only demo account constants used by seed helpers.
 class DemoAccounts {
   static const athleteEmail = 'demo.athlete@athleteiq.app';
   static const coachEmail = 'demo.coach@athleteiq.app';

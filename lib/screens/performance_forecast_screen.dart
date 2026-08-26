@@ -11,6 +11,7 @@ import '../utils/privacy_redaction.dart';
 import '../utils/risk_signals.dart';
 import '../widgets/async_body.dart';
 import '../widgets/hero_card.dart';
+import '../widgets/responsive_chart_frame.dart';
 import 'not_enough_data_screen.dart';
 
 /// Coach performance forecast — Banister band over time plus current drivers.
@@ -25,7 +26,11 @@ class PerformanceForecastScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Forecast · ${athlete.name}'),
+        title: Text(
+          'Forecast · ${athlete.name}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         centerTitle: true,
       ),
       body: StreamBuilder<RiskResult?>(
@@ -218,16 +223,12 @@ class _PerformanceLineChart extends StatelessWidget {
     ];
     final dateFmt = DateFormat('M/d');
 
-    return RepaintBoundary(
-      child: Container(
-      height: 240,
-      padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: LineChart(
+    return ResponsiveChartFrame(
+      maxHeight: 240,
+      minHeight: 150,
+      builder: (context, size) {
+        final reservedLeft = size.width < 360 ? 52.0 : 78.0;
+        return LineChart(
         LineChartData(
           minY: -0.2,
           maxY: 2.2,
@@ -249,7 +250,7 @@ class _PerformanceLineChart extends StatelessWidget {
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 78,
+                reservedSize: reservedLeft,
                 interval: 1,
                 getTitlesWidget: (value, meta) {
                   final label = switch (value.round()) {
@@ -259,9 +260,13 @@ class _PerformanceLineChart extends StatelessWidget {
                     _ => '',
                   };
                   if (label.isEmpty) return const SizedBox.shrink();
-                  return Text(
+                  return FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
                     label,
                     style: TextStyle(fontSize: 9, color: AppColors.textMuted),
+                    ),
                   );
                 },
               ),
@@ -312,8 +317,8 @@ class _PerformanceLineChart extends StatelessWidget {
           ],
         ),
         duration: Duration.zero,
-      ),
-    ),
+      );
+      },
     );
   }
 }
@@ -441,12 +446,18 @@ class _DriverRow extends StatelessWidget {
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
         ],

@@ -146,9 +146,12 @@ class _CoachRosterScreenState extends State<CoachRosterScreen> {
                   .take(5)
                   .toList();
               if (high.isEmpty) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: Container(
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 140),
+                      child: SingleChildScrollView(
+                        child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -161,6 +164,8 @@ class _CoachRosterScreenState extends State<CoachRosterScreen> {
                     children: [
                       const Text(
                         'NEEDS REVIEW — RISK SPIKE OR HIGH PAIN',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 11,
                           color: AppColors.coral,
@@ -174,6 +179,8 @@ class _CoachRosterScreenState extends State<CoachRosterScreen> {
                           padding: const EdgeInsets.only(bottom: 6),
                           child: Text(
                             '${alert.athleteName}: ${alert.summary}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.textPrimary,
@@ -184,7 +191,9 @@ class _CoachRosterScreenState extends State<CoachRosterScreen> {
                     ],
                   ),
                 ),
-              );
+                      ),
+                    ),
+                  );
             },
           ),
           Expanded(
@@ -288,90 +297,115 @@ class _CoachRosterScreenState extends State<CoachRosterScreen> {
                     final needsReview = athleteNeedsReview(athlete, risk);
                     final lastCheckIn = _lastCheckInByUid[athlete.uid];
 
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(
-                        backgroundColor: AppColors.surface,
-                        child: Text(
-                          _initials(athlete.name),
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      title: Row(
-                        children: [
-                          Expanded(child: Text(athlete.name)),
-                          if (needsReview)
-                            Container(
-                              margin: const EdgeInsets.only(left: 6),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.riskHighBg,
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(
-                                  color: AppColors.coral.withValues(alpha: 0.4),
-                                ),
-                              ),
-                              child: const Text(
-                                'REVIEW',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.coral,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      subtitle: Text(
-                        [
-                          athlete.sportsLabel.isNotEmpty
-                              ? athlete.sportsLabel
-                              : 'Sport not set',
-                          if (lastCheckIn != null)
-                            'Last log ${_formatRelativeDate(lastCheckIn)}',
-                        ].join(' · '),
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if ((athlete.latestPainUrgency ?? '').toUpperCase() ==
-                              'HIGH') ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.riskHighBg,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: AppColors.coral.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              child: const Text(
-                                'PAIN',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.coral,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                          ],
-                          RiskChip(level: level),
-                        ],
-                      ),
+                    return InkWell(
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => CoachDashboardScreen(athlete: athlete),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CircleAvatar(
+                              backgroundColor: AppColors.surface,
+                              child: Text(
+                                _initials(athlete.name),
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    athlete.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                          fontSize: 15,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    [
+                                      athlete.sportsLabel.isNotEmpty
+                                          ? athlete.sportsLabel
+                                          : 'Sport not set',
+                                      if (lastCheckIn != null)
+                                        'Last log ${_formatRelativeDate(lastCheckIn)}',
+                                    ].join(' · '),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    children: [
+                                      if (needsReview)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.riskHighBg,
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(
+                                              color: AppColors.coral.withValues(alpha: 0.4),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'REVIEW',
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppColors.coral,
+                                            ),
+                                          ),
+                                        ),
+                                      if ((athlete.latestPainUrgency ?? '').toUpperCase() ==
+                                          'HIGH')
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.riskHighBg,
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: AppColors.coral.withValues(alpha: 0.5),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'PAIN',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.coral,
+                                            ),
+                                          ),
+                                        ),
+                                      RiskChip(level: level),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     );

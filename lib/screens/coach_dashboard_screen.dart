@@ -36,7 +36,13 @@ class CoachDashboardScreen extends StatelessWidget {
       builder: (context, profileSnap) {
         final profile = profileSnap.data ?? athlete;
         return Scaffold(
-          appBar: AppBar(title: Text(profile.name)),
+          appBar: AppBar(
+            title: Text(
+              profile.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           body: StreamBuilder<RiskLatest>(
             stream: fs.streamRiskLatest(profile.uid),
             builder: (context, snapshot) {
@@ -65,6 +71,8 @@ class CoachDashboardScreen extends StatelessWidget {
                       _PrivacyWithheldBanner(privacy: privacy),
                     ],
                     const SizedBox(height: 12),
+                    if (isPending)
+                      const _PendingCoachReviewBanner(),
                     Row(
                       children: [
                         Expanded(
@@ -76,7 +84,10 @@ class CoachDashboardScreen extends StatelessWidget {
                               ),
                             ),
                             icon: const Icon(Icons.track_changes, size: 18),
-                            label: const Text('Forecast'),
+                            label: const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text('Forecast'),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -88,7 +99,10 @@ class CoachDashboardScreen extends StatelessWidget {
                               ),
                             ),
                             icon: const Icon(Icons.analytics_outlined, size: 18),
-                            label: const Text('Risk detail'),
+                            label: const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text('Risk detail'),
+                            ),
                           ),
                         ),
                       ],
@@ -112,7 +126,10 @@ class CoachDashboardScreen extends StatelessWidget {
                           ),
                         ),
                         icon: const Icon(Icons.calendar_view_week, size: 18),
-                        label: const Text('Week in review'),
+                        label: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('Week in review'),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -132,7 +149,10 @@ class CoachDashboardScreen extends StatelessWidget {
                           );
                         },
                         icon: const Icon(Icons.show_chart_outlined, size: 18),
-                        label: const Text('Trends'),
+                        label: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('Trends'),
+                        ),
                       ),
                     ),
                   ],
@@ -184,9 +204,13 @@ class CoachDashboardScreen extends StatelessWidget {
                   children: [
                     RiskChip(level: result.riskLevel),
                     const SizedBox(width: 8),
-                    Text(
+                    Expanded(
+                      child: Text(
                       'Confidence: ${sharedOrHidden(privacy.wearableData, result.confidence)}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall,
+                    ),
                     ),
                   ],
                 ),
@@ -335,19 +359,39 @@ class CoachDashboardScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(10),
+                    border: isPending
+                        ? Border.all(color: AppColors.amber.withValues(alpha: 0.55))
+                        : null,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('RECOMMENDATION',
-                          style: TextStyle(
-                              fontSize: 11, color: AppColors.coral, fontWeight: FontWeight.w700)),
+                      Text(
+                        isPending ? 'RECOMMENDATION — PENDING YOUR REVIEW' : 'RECOMMENDATION',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isPending ? AppColors.amber : AppColors.coral,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 6),
                       Text(result.recommendation, style: const TextStyle(fontSize: 15)),
-                      if (result.recommendationStatus != null && !isPending) ...[
+                      if (isPending) ...[
                         const SizedBox(height: 8),
-                        Text('Status: ${result.recommendationStatus}',
-                            style: Theme.of(context).textTheme.bodySmall),
+                        Text(
+                          'The athlete cannot see this plan until you approve, modify, or reject it.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            height: 1.35,
+                          ),
+                        ),
+                      ] else if (result.recommendationStatus != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          _reviewAuditLine(result),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       ],
                     ],
                   ),
@@ -364,49 +408,38 @@ class CoachDashboardScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (var i = 0; i < result.gradedOptions.length; i++)
-                          Expanded(
-                            child: Padding(
-                              padding: EdgeInsets.only(
-                                right: i < result.gradedOptions.length - 1 ? 8 : 0,
+                  for (var i = 0; i < result.gradedOptions.length; i++) ...[
+                    _GradedOptionCard(
+                      option: result.gradedOptions[i],
+                      onApprove: () async {
+                        final option = result.gradedOptions[i];
+                        try {
+                          await fs.reviewRecommendation(
+                            profile.uid,
+                            decision: 'approved',
+                            modifiedText: option.action,
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Approved ${option.tier} option for ${profile.name}',
+                                ),
                               ),
-                              child: _GradedOptionCard(
-                                option: result.gradedOptions[i],
-                                onApprove: () async {
-                                  final option = result.gradedOptions[i];
-                                  try {
-                                    await fs.reviewRecommendation(
-                                      profile.uid,
-                                      decision: 'approved',
-                                      modifiedText: option.action,
-                                    );
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'Approved ${option.tier} option for ${profile.name}',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  } catch (e) {
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text(friendlyError(e))),
-                                      );
-                                    }
-                                  }
-                                },
-                              ),
-                            ),
-                          ),
-                      ],
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(friendlyError(e))),
+                            );
+                          }
+                        }
+                      },
                     ),
-                  ),
+                    if (i < result.gradedOptions.length - 1)
+                      const SizedBox(height: 8),
+                  ],
                 ],
                 if (isPending) ...[
                   const SizedBox(height: 16),
@@ -432,7 +465,10 @@ class CoachDashboardScreen extends StatelessWidget {
                               }
                             }
                           },
-                          child: const Text('Approve primary'),
+                          child: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('Approve primary'),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -509,6 +545,64 @@ class CoachDashboardScreen extends StatelessWidget {
               }
             },
             child: const Text('Send to athlete'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _reviewAuditLine(RiskResult result) {
+  final status = (result.recommendationStatus ?? '').toLowerCase();
+  final when = result.reviewedAt;
+  final who = result.reviewedBy;
+  final parts = <String>['Status: ${result.recommendationStatus}'];
+  if (who != null && who.isNotEmpty) {
+    parts.add('by coach $who');
+  }
+  if (when != null && when.isNotEmpty) {
+    parts.add('at $when');
+  }
+  if (status == 'rejected') {
+    parts.add('(athlete does not see this plan)');
+  }
+  return parts.join(' · ');
+}
+
+class _PendingCoachReviewBanner extends StatelessWidget {
+  const _PendingCoachReviewBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.riskMedBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.amber.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'PENDING COACH REVIEW',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+              color: AppColors.amber,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'This plan is waiting on you. The athlete only sees scores until you approve, modify, or reject it — including Orchestrator and graded-option wording.',
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: AppColors.textPrimary,
+            ),
           ),
         ],
       ),
@@ -1008,7 +1102,6 @@ class _GradedOptionCard extends StatelessWidget {
               height: 1.3,
             ),
           ),
-          const Spacer(),
           const SizedBox(height: 10),
           OutlinedButton(
             onPressed: onApprove,

@@ -445,46 +445,55 @@ class _DeviceCard extends StatelessWidget {
                 ),
 
                 // Action / Status Badge
-                if (isConnected)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.mint.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.check, color: AppColors.mint, size: 16),
-                        SizedBox(width: 4),
-                        Text(
-                          'Connected',
-                          style: TextStyle(
-                            color: AppColors.mint,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: isConnected
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.mint.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.check, color: AppColors.mint, size: 16),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Connected',
+                                  style: TextStyle(
+                                    color: AppColors.mint,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColors.mint.withValues(alpha: 0.6),
+                              ),
+                            ),
+                            child: const Text(
+                              'Connect',
+                              style: TextStyle(
+                                color: AppColors.mint,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.mint.withValues(alpha: 0.6)),
-                    ),
-                    child: const Text(
-                      'Connect',
-                      style: TextStyle(
-                        color: AppColors.mint,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
                   ),
+                ),
               ],
             ),
           ),

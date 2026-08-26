@@ -38,7 +38,7 @@ class MyAlertsScreen extends StatelessWidget {
                 icon: Icons.notifications_none,
                 heading: 'No alerts yet',
                 subtext:
-                    'Risk spikes, missed check-ins, and sync issues will show up here after they actually happen. This list is empty — nothing is fabricated.',
+                    'When your coach approves a plan, or when a risk spike, missed check-in, or sync issue happens, it will show up here.',
               ),
             );
           }
@@ -79,6 +79,8 @@ class MyAlertsScreen extends StatelessWidget {
                           children: [
                             Text(
                               alert.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,

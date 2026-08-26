@@ -11,8 +11,14 @@
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
     "test:orchestrator": "npm run build && node lib/orchestratorCompare.js",
-    "test:views": "npm run build && node --test lib/privacyViews.test.js lib/deleteAccount.test.js",
-    "test:delete-account": "npm run build && node --test lib/deleteAccount.test.js"
+    "test:views": "npm run build && node --test lib/privacyViews.test.js lib/deleteAccount.test.js lib/recommendationGate.test.js",
+    "test:ai-chat": "npm run build && node --test lib/aiChat.test.js",
+    "test:delete-account": "npm run build && node --test lib/deleteAccount.test.js",
+    "test:prompts": "npm run build && node --test lib/promptFragments.test.js",
+    "test:eval": "npm run build && node --test lib/evaluation/evaluate.test.js",
+    "test:calculations": "npm run build && node --test lib/calculations.test.js",
+    "test:non-negotiables": "npm run build && node --test lib/nonNegotiables.test.js",
+    "test": "npm run build && node --test lib/aiChat.test.js lib/privacyViews.test.js lib/deleteAccount.test.js lib/recommendationGate.test.js lib/promptFragments.test.js lib/evaluation/evaluate.test.js lib/calculations.test.js lib/llmGuardrails.test.js lib/nonNegotiables.test.js lib/langsmithPrivacy.test.js"
   },
   "dependencies": {
     "@langchain/anthropic": "^0.3.26",
@@ -20,6 +26,7 @@
     "firebase-admin": "^12.5.0",
     "firebase-functions": "^5.1.1",
     "langchain": "^0.3.27",
+    "langsmith": "^0.3.87",
     "zod": "^3.25.76"
   },
   "devDependencies": {

@@ -1,4 +1,5 @@
 import { ChatAnthropic } from '@langchain/anthropic';
+import { disableLangChainAutoTracing } from './langsmithDevTrace';
 
 /**
  * LangChain defaults topP/topK to -1 ("unset") and always sends temperature.
@@ -9,6 +10,7 @@ export function createChatAnthropic(fields: {
   apiKey: string;
   maxTokens: number;
 }): ChatAnthropic {
+  disableLangChainAutoTracing();
   const model = new ChatAnthropic({
     apiKey: fields.apiKey,
     model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5',

@@ -20,31 +20,40 @@ class SyncFailedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final body = Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            EmptyState(
-              icon: Icons.watch_rounded,
-              heading: '${issue.deviceName} sync failed',
-              subtext: issue.message,
-              actionLabel: 'Reconnect device',
-              onAction: onReconnect,
-              warn: true,
-            ),
-            if (onReportPain != null) ...[
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: onReportPain,
-                icon: const Icon(Icons.healing_outlined, size: 18),
-                label: const Text('Report pain instead'),
+    final body = LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    EmptyState(
+                      icon: Icons.watch_rounded,
+                      heading: '${issue.deviceName} sync failed',
+                      subtext: issue.message,
+                      actionLabel: 'Reconnect device',
+                      onAction: onReconnect,
+                      warn: true,
+                    ),
+                    if (onReportPain != null) ...[
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: onReportPain,
+                        icon: const Icon(Icons.healing_outlined, size: 18),
+                        label: const Text('Report pain instead'),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ],
-          ],
-        ),
-      ),
+            ),
+          ),
+        );
+      },
     );
 
     if (!asPage) return body;

@@ -10,6 +10,7 @@ import '../services/firestore_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/risk_signals.dart';
 import '../widgets/async_body.dart';
+import '../widgets/responsive_chart_frame.dart';
 import '../widgets/risk_chip.dart';
 
 /// Team-wide snapshot + per-athlete multi-week ACWR and load trends.
@@ -304,7 +305,10 @@ class _CoachTrendsScreenState extends State<CoachTrendsScreen> {
           ),
           items: [
             for (final a in athletes)
-              DropdownMenuItem(value: a.uid, child: Text(a.name)),
+              DropdownMenuItem(
+                value: a.uid,
+                child: Text(a.name, overflow: TextOverflow.ellipsis),
+              ),
           ],
           onChanged: (v) {
             setState(() => _selectedAthleteUid = v);
@@ -317,11 +321,15 @@ class _CoachTrendsScreenState extends State<CoachTrendsScreen> {
             children: [
               RiskChip(level: latest.riskLevel),
               const SizedBox(width: 8),
-              Text(
+              Expanded(
+                child: Text(
                 athlete.privacySettings.trainingLogs
                     ? 'ACWR ${latest.acwr.toStringAsFixed(2)} · 7d load ${latest.trainingLoad7d.toStringAsFixed(0)}'
                     : 'Training logs not shared',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall,
+              ),
               ),
             ],
           ),
@@ -503,10 +511,11 @@ class _TeamAcwrChart extends StatelessWidget {
     final maxY = (maxAcwr < 1.8 ? 1.8 : maxAcwr + 0.2).clamp(1.8, 3.0);
     final dateFmt = DateFormat('M/d');
 
-    return RepaintBoundary(
-      child: SizedBox(
-      height: 220,
-      child: LineChart(
+    return ResponsiveChartFrame(
+      maxHeight: 220,
+      minHeight: 150,
+      builder: (context, size) {
+        return LineChart(
         LineChartData(
           minY: 0,
           maxY: maxY.toDouble(),
@@ -568,8 +577,8 @@ class _TeamAcwrChart extends StatelessWidget {
           ],
         ),
         duration: Duration.zero,
-      ),
-    ),
+      );
+      },
     );
   }
 }
@@ -589,16 +598,11 @@ class _AthleteAcwrChart extends StatelessWidget {
     final maxY = (maxAcwr < 1.8 ? 1.8 : maxAcwr + 0.2).clamp(1.8, 3.0);
     final dateFmt = DateFormat('M/d');
 
-    return RepaintBoundary(
-      child: Container(
-      height: 260,
-      padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: LineChart(
+    return ResponsiveChartFrame(
+      maxHeight: 260,
+      minHeight: 160,
+      builder: (context, size) {
+        return LineChart(
         LineChartData(
           minY: 0,
           maxY: maxY.toDouble(),
@@ -659,8 +663,8 @@ class _AthleteAcwrChart extends StatelessWidget {
           ],
         ),
         duration: Duration.zero,
-      ),
-    ),
+      );
+      },
     );
   }
 }

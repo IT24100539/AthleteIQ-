@@ -12,6 +12,7 @@ import { CheckInLoader, loadCheckIns } from './checkInLoader';
 import { wordingSport } from './athleteSports';
 import { assessRisk } from './riskModel';
 import { getFirestore } from 'firebase-admin/firestore';
+import { logger } from 'firebase-functions';
 
 export const ORCHESTRATOR_TOOL_DEFS = [
   {
@@ -93,7 +94,7 @@ export async function getPerformancePrediction(
     return JSON.stringify({ error: 'insufficient_data', checkInCount: entries.length });
   }
   const a = assessRisk(entries, await sportGroupFor(athleteId));
-  const ff = calculateFitnessFatigue([...entries].reverse());
+  const ff = calculateFitnessFatigue(entries);
   const recovery = calculateRecoveryTrend(entries);
   return JSON.stringify({
     performancePrediction: a.performancePrediction,
@@ -128,23 +129,39 @@ export async function getAthleteHistory(
   });
 }
 
+/**
+ * Tools always load `boundAthleteId` from the Orchestrator session.
+ * The model's `athleteId` argument is ignored except to log a mismatch —
+ * it must never be used as a Firestore path, or the agent could read
+ * another athlete's check-ins.
+ */
 export async function invokeOrchestratorTool(
   name: string,
   args: Record<string, unknown>,
   loadEntries: CheckInLoader = loadCheckIns,
+  boundAthleteId?: string,
 ): Promise<string> {
+  const athleteId = (boundAthleteId ?? '').trim();
+  if (!athleteId) {
+    return JSON.stringify({ error: 'missing_bound_athleteId' });
+  }
+  const requested = String(args.athleteId ?? '').trim();
+  if (requested && requested !== athleteId) {
+    logger.warn('orchestrator tool: ignored athleteId that did not match the session athlete', {
+      name,
+      requested,
+      boundAthleteId: athleteId,
+    });
+  }
+
   if (name === 'getRiskAssessment') {
-    return getRiskAssessment(String(args.athleteId ?? ''), loadEntries);
+    return getRiskAssessment(athleteId, loadEntries);
   }
   if (name === 'getPerformancePrediction') {
-    return getPerformancePrediction(String(args.athleteId ?? ''), loadEntries);
+    return getPerformancePrediction(athleteId, loadEntries);
   }
   if (name === 'getAthleteHistory') {
-    return getAthleteHistory(
-      String(args.athleteId ?? ''),
-      Number(args.days ?? 14),
-      loadEntries,
-    );
+    return getAthleteHistory(athleteId, Number(args.days ?? 14), loadEntries);
   }
   return JSON.stringify({ error: `Unknown tool: ${name}` });
 }

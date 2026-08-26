@@ -46,7 +46,7 @@ void main() {
       expect(map['date'], isA<Timestamp>());
     });
 
-    test('writes optional manual resting HR and never invents HRV', () {
+    test('writes resting HR without inventing HRV', () {
       final map = CheckIn(
         id: '',
         date: DateTime(2026, 8, 16),
@@ -57,6 +57,20 @@ void main() {
 
       expect(map['restingHeartRate'], 58);
       expect(map.containsKey('hrv'), isFalse);
+    });
+
+    test('writes optional manual resting HR and HRV when entered', () {
+      final map = CheckIn(
+        id: '',
+        date: DateTime(2026, 8, 16),
+        fatigueScore: 3,
+        sleepHours: 7,
+        restingHeartRate: 58,
+        hrv: 62,
+      ).toMap();
+
+      expect(map['restingHeartRate'], 58);
+      expect(map['hrv'], 62);
     });
   });
 }

@@ -102,7 +102,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   final slide = _slides[i];
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Column(
+                    child: SingleChildScrollView(
+                      child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
@@ -127,6 +128,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
+                    ),
                     ),
                   );
                 },

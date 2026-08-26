@@ -25,16 +25,28 @@ describe('buildAthleteRiskView', () => {
     calculatedAt: '2026-08-15T12:00:00.000Z',
   };
 
-  it('omits recommendation while pending', () => {
-    const view = buildAthleteRiskView(latest);
-    assert.equal(view.riskLevel, 'HIGH');
-    assert.equal(view.acwr, 1.6);
-    assert.equal(view.recommendationStatus, 'pending');
+  it('omits Orchestrator, graded options, and LLM prose while pending', () => {
+    const view = buildAthleteRiskView({
+      ...latest,
+      recommendationStatus: 'pending',
+      orchestratorSource: 'llm',
+      gradedOptionsSource: 'llm',
+      riskLevelReasoningLLM: 'LLM risk',
+      performanceReasoningLLM: 'LLM performance',
+      ruleBasedRecommendation: 'Rule rec',
+    });
     assert.equal(view.recommendation, undefined);
-    assert.equal(view.reason, undefined);
     assert.equal(view.gradedOptions, undefined);
     assert.equal(view.researchNote, undefined);
     assert.equal(view.orchestratorConflict, undefined);
+    assert.equal(view.orchestratorSource, undefined);
+    assert.equal(view.riskLevelReasoningLLM, undefined);
+    assert.equal(view.performanceReasoningLLM, undefined);
+    assert.equal(view.ruleBasedRecommendation, undefined);
+    assert.equal(view.riskLevel, 'HIGH');
+    assert.equal(view.acwr, 1.6);
+    assert.equal(view.recommendationStatus, 'pending');
+    assert.equal(view.reason, undefined);
   });
 
   it('copies the released plan after approval', () => {

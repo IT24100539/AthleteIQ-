@@ -23,6 +23,7 @@ export const ATHLETE_SUBCOLLECTIONS = [
   'alerts',
   'orchestratorTraces',
   'weeklyReports',
+  'llmEvaluations',
 ] as const;
 
 /** Subcollections under `coaches/{uid}`. Keep in sync with firestore.rules. */

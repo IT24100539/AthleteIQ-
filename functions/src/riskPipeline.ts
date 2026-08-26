@@ -1,6 +1,11 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
-import { isFatiguePersistent } from './calculations';
+import {
+  averagePresent,
+  calendarWindow,
+  isFatiguePersistent,
+  utcDateKey,
+} from './calculations';
 import { loadCheckIns } from './checkInLoader';
 import { enrichAssessmentExplanation } from './explainabilityLlm';
 import { generateGradedOptions } from './gradedRecommendations';
@@ -11,26 +16,29 @@ import { wordingSport } from './athleteSports';
 import { loadTeamSettings } from './teamSettings';
 import { writeAthleteRiskView } from './privacyViews';
 
+/** Section 6 / 11 / 17.1 — every new assessment waits for coach review. */
+export const PENDING_RECOMMENDATION_STATUS = 'pending';
+
+/** Pipeline writes never skip the Human Approval Step. */
+export function statusForNewRiskWrite(): typeof PENDING_RECOMMENDATION_STATUS {
+  return PENDING_RECOMMENDATION_STATUS;
+}
+
 export type RiskPipelineResult =
   | { status: 'not_found' }
   | { status: 'insufficient_data'; checkInCount: number }
   | { status: 'ok'; riskLevel: string };
 
-export type RunRiskPipelineOptions = {
-  /**
-   * Callable / new check-in: always `pending` so the coach re-reviews.
-   * Nightly: keep the existing status when the action text is unchanged.
-   */
-  resetRecommendationStatus?: boolean;
-};
-
 /**
  * Shared Risk → Performance → Orchestrator pipeline.
  * Used by the on-demand callable and the nightly scheduled job.
+ *
+ * recommendationStatus is always `pending` on write — including Orchestrator
+ * (E3) and graded-options (E4) output. Coach review is the only path to
+ * approved | modified | rejected.
  */
 export async function runRiskPipeline(
   athleteUid: string,
-  options: RunRiskPipelineOptions = {},
 ): Promise<RiskPipelineResult> {
   const db = getFirestore();
   const athleteRef = db.collection('athletes').doc(athleteUid);
@@ -59,7 +67,8 @@ export async function runRiskPipeline(
   const coachUid =
     typeof athleteData.coachUid === 'string' ? athleteData.coachUid : null;
   const teamSettings = await loadTeamSettings(coachUid);
-  const assessment = assessRisk(entries, sportGroup);
+  const asOf = utcDateKey();
+  const assessment = assessRisk(entries, sportGroup, asOf);
 
   // Classification is already locked. LLM may only add prose fields.
   let riskLevelReasoningLLM = assessment.reason;
@@ -81,16 +90,10 @@ export async function runRiskPipeline(
     sportGroup,
     defaultActionPercent: teamSettings.defaultActionPercent,
     persistTrace: true,
+    asOf,
   });
 
-  const resetStatus = options.resetRecommendationStatus ?? true;
-  const existing = resetStatus ? undefined : (await resultRef.get()).data();
-  const recommendationStatus =
-    !resetStatus &&
-    existing?.recommendation === orchestrator.action &&
-    typeof existing?.recommendationStatus === 'string'
-      ? existing.recommendationStatus
-      : 'pending';
+  const recommendationStatus = statusForNewRiskWrite();
 
   let researchNote = '';
   let researchCitations: { tag: string; text: string; source: string }[] = [];
@@ -121,16 +124,12 @@ export async function runRiskPipeline(
     logger.warn('graded options skipped', err);
   }
 
-  const last7 = entries.slice(0, 7);
-  const avgFatigue7d =
-    last7.length === 0
-      ? null
-      : last7.reduce((sum, e) => sum + (e.fatigueScore ?? 3), 0) / last7.length;
-  const fatiguePersistent = isFatiguePersistent(entries);
+  const avgFatigue7d = averagePresent(
+    calendarWindow(entries, 7, asOf).map((d) => d.entry?.fatigueScore),
+  );
+  const fatiguePersistent = isFatiguePersistent(entries, asOf);
   const calculatedAt = new Date().toISOString();
-  const dayKey = /^\d{4}-\d{2}-\d{2}$/.test(entries[0]?.date)
-    ? entries[0].date
-    : calculatedAt.slice(0, 10);
+  const dayKey = asOf;
 
   const payload = {
     riskLevel: assessment.riskLevel,

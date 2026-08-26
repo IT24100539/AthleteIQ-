@@ -8,7 +8,9 @@ import { StringOutputParser } from '@langchain/core/output_parsers';
 import { createChatAnthropic } from './anthropic';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { logger } from 'firebase-functions';
+import { jsonExampleForChatPrompt } from './promptFragments';
 import { SportGroup } from './recommendationEngine';
+import { logGuardrailFallback, parseClassifyOutput } from './llmGuardrails';
 
 export type SportClassificationConfidence = 'high' | 'low';
 
@@ -20,15 +22,6 @@ export interface SportClassificationResult {
   groupLabel: string;
 }
 
-const VALID_GROUPS: SportGroup[] = [
-  'endurance',
-  'teamContact',
-  'strengthPower',
-  'skillPrecision',
-  'combat',
-  'other',
-];
-
 const GROUP_LABELS: Record<SportGroup, string> = {
   endurance: 'Endurance',
   teamContact: 'Team / Contact',
@@ -38,7 +31,7 @@ const GROUP_LABELS: Record<SportGroup, string> = {
   other: 'Other (generic)',
 };
 
-const CLASSIFY_PROMPT = `You classify a free-text sport name into exactly one AthleteIQ sport group for training recommendations.
+export const CLASSIFY_PROMPT = `You classify a free-text sport name into exactly one AthleteIQ sport group for training recommendations.
 
 Groups (return the sportGroup id exactly):
 - endurance — running, cycling, swimming, triathlon, rowing, hiking, ski endurance, etc.
@@ -49,15 +42,9 @@ Groups (return the sportGroup id exactly):
 - other — only if the sport truly does not fit any group OR you are unsure
 
 Return JSON only:
-{"sportGroup":"endurance|teamContact|strengthPower|skillPrecision|combat|other","confidence":"high|low","reason":"one short sentence"}
+${jsonExampleForChatPrompt('{"sportGroup":"endurance|teamContact|strengthPower|skillPrecision|combat|other","confidence":"high|low","reason":"one short sentence"}')}
 
 Use confidence "high" only when the mapping is obvious. Use "low" when ambiguous, obscure, multi-discipline, or you would be guessing.`;
-
-function normalizeGroup(raw: unknown): SportGroup | null {
-  if (typeof raw !== 'string') return null;
-  const key = raw.trim();
-  return VALID_GROUPS.includes(key as SportGroup) ? (key as SportGroup) : null;
-}
 
 function ruleBasedClassify(sportText: string): SportClassificationResult {
   const text = sportText.toLowerCase();
@@ -176,27 +163,21 @@ function result(
   };
 }
 
-function parseClassifyJson(raw: string): {
-  sportGroup?: SportGroup;
-  confidence?: SportClassificationConfidence;
-} | null {
-  const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  if (start === -1 || end <= start) return null;
-  try {
-    const parsed = JSON.parse(trimmed.slice(start, end + 1)) as {
-      sportGroup?: string;
-      confidence?: string;
-    };
-    const sportGroup = normalizeGroup(parsed.sportGroup);
-    if (!sportGroup) return null;
-    const confidence: SportClassificationConfidence =
-      parsed.confidence === 'high' ? 'high' : 'low';
-    return { sportGroup, confidence };
-  } catch {
-    return null;
+export function applyClassifyLlmResponse(
+  raw: string,
+  sportText: string,
+): SportClassificationResult {
+  const sport = sportText.trim();
+  const parsed = parseClassifyOutput(raw);
+  if (!parsed.ok) {
+    logGuardrailFallback('classify', parsed.reason);
+    return ruleBasedClassify(sport);
   }
+  const group = parsed.data.sportGroup;
+  if (parsed.data.confidence === 'low' || group === 'other') {
+    return result(sport, 'other', 'low', 'llm');
+  }
+  return result(sport, group, 'high', 'llm');
 }
 
 /**
@@ -221,18 +202,7 @@ export async function classifyCustomSport(sportText: string): Promise<SportClass
     ]);
     const chain = prompt.pipe(model).pipe(new StringOutputParser());
     const raw = await chain.invoke({ sport });
-    const parsed = parseClassifyJson(raw);
-    if (!parsed) {
-      logger.warn('sport classifier: invalid LLM JSON, using rules fallback');
-      return ruleBasedClassify(sport);
-    }
-
-    const group = parsed.sportGroup;
-    if (!group || parsed.confidence === 'low' || group === 'other') {
-      return result(sport, 'other', 'low', 'llm');
-    }
-
-    return result(sport, group, 'high', 'llm');
+    return applyClassifyLlmResponse(raw, sport);
   } catch (err) {
     logger.warn('sport classifier LLM failed; using rules fallback', err);
     return ruleBasedClassify(sport);

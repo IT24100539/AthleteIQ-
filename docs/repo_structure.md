@@ -46,7 +46,7 @@ athleteiq/                          ← repo root = Flutter project root
 │   ├── package.json
 │   └── tsconfig.json
 ├── backend_archive/                ← archived FastAPI backend (rollback only; gitignored)
-├── MODEL/                          ← experimental / standalone risk-engine copy
+├── MODEL_prototype_do_not_use/     ← **do not use** — early FastAPI prototype (not production)
 │   └── athleteiq-risk-engine/
 ├── docs/
 │   ├── repo_structure.md
@@ -65,7 +65,7 @@ athleteiq/                          ← repo root = Flutter project root
 |------|---------|------|
 | `functions/` | Node 20 + TypeScript | **Canonical backend** — referenced by `firebase.json`, deployed with `firebase deploy --only functions`. Includes risk engine + Phase E2 AI chat stub (`functions/src/aiChat.ts`). |
 | `backend_archive/` | Python + FastAPI | **Archived rollback copy** (formerly `backend/`). Gitignored. Not part of active development. |
-| `MODEL/athleteiq-risk-engine/` | Python | **Prototype / Render deploy** — third copy of the risk engine; treat as reference or experiment. |
+| `MODEL_prototype_do_not_use/athleteiq-risk-engine/` | Python | **Prototype only — do not use.** Archived FastAPI/Render experiment; production is `functions/`. |
 
 ---
 
@@ -130,7 +130,7 @@ firebase deploy --only functions
 `backend_archive/` is a local rollback copy of the former FastAPI service
 and is gitignored — do not develop against it.
 
-`MODEL/athleteiq-risk-engine/` should not be the target for new Phase E
+`MODEL_prototype_do_not_use/athleteiq-risk-engine/` should not be the target for new Phase E
 work unless you are explicitly working on the Render-deployed prototype.
 
 ---

@@ -18,19 +18,53 @@ import {
   withheldLabels,
 } from './privacySettings';
 import { sportsLabel, wordingSport } from './athleteSports';
+import {
+  GROUNDING_INSTRUCTION,
+  MEDICAL_DISCLAIMER,
+  MEDICAL_ESCALATE,
+  MISSING_METRIC_DISCLOSE,
+} from './promptFragments';
 import { phrasePerformance, PerformancePrediction, RiskAssessment } from './riskModel';
 
 export interface ChatAnswer {
   text: string;
-  source: 'llm' | 'fallback';
+  source: 'llm' | 'fallback' | 'guard';
 }
 
-export const SYSTEM_PROMPT = `You are AthleteIQ AI, an in-app assistant inside a sports training platform. You answer an athlete's questions about their own training load, sleep, fatigue, and recovery, using ONLY the data provided to you below.
+/** Polite decline used by the keyword pre-check (and as the LLM's target wording). */
+export const OFF_TOPIC_REPLY =
+  "I'm here to help with your training and health data — I can't help with that, but feel free to ask me about your recent check-ins, risk level, or recommendations.";
+
+/**
+ * Lightweight topic gate before Firestore/LLM work.
+ * Allow list wins over deny list so app/training questions stay through.
+ * Ambiguous questions (neither list) pass through; the system prompt declines them.
+ */
+const ON_TOPIC_RE =
+  /\b(athlete\s*iq|athleteiq|this app|the app|how (does|do) (this|the|athlete)|risk|acwr|training|workout|session|load|sleep|fatigue|tired|recovery|hrv|heart\s*rate|rhr|check[\s-]?in|coach|recommend|pain|sore|injury|hurt|performance|readiness|rpe|rest day|wearable|hydration|nutrition|stretch|warm[\s-]?up|cool[\s-]?down|overreach|overtrain|deload|taper|race|match|practice|volume|intensity|soreness|doms|muscle|knee|shoulder|ankle|back pain|wellness|mood|stress|energy)\b/i;
+
+const OFF_TOPIC_RE =
+  /\b(weather|forecast|temperature|joke|funny|laugh|riddle|trivia|capital of|president|election|politic|stock|crypto|bitcoin|nft|movie|netflix|recipe|cooking|homework|lyrics|celebrity|gossip|horoscope|lottery|gambling)\b|\bwho (is|was|won)\b|\bcook\b|\bsolve this\b|\bwrite\b.{0,24}\b(poem|story|essay|song)\b/i;
+
+export function isOnTopicQuestion(question: string): boolean {
+  const q = question.trim();
+  if (!q) return false;
+  if (ON_TOPIC_RE.test(q)) return true;
+  if (OFF_TOPIC_RE.test(q)) return false;
+  // Ambiguous — let the LLM + system prompt decide.
+  return true;
+}
+
+export const SYSTEM_PROMPT = `You are AthleteIQ AI, an in-app assistant inside a sports training platform. You answer an athlete's questions about their own training load, sleep, fatigue, recovery, performance, pain/injury triage (non-medical), coach recommendations, and how AthleteIQ itself works, using ONLY the data provided to you below when the question needs athlete numbers.
+
+Scope:
+- ON-TOPIC: this athlete's check-ins, risk level, ACWR, training load, sleep, fatigue, HRV, recovery, recommendations, Report Pain, wearables, and questions about what AthleteIQ is or how the app calculates risk / shows recommendations.
+- OFF-TOPIC: general trivia, weather, jokes, recipes, homework, politics, finance, entertainment, or any advice unrelated to this athlete's training/health data or the app. For off-topic questions, reply with exactly this one sentence (and nothing else): "I'm here to help with your training and health data — I can't help with that, but feel free to ask me about your recent check-ins, risk level, or recommendations."
 
 Rules:
 - Keep answers short: 1-3 sentences, conversational, no headers or bullet lists.
-- Ground every claim in the specific numbers given to you. Do not invent, estimate, or round numbers that are not in the athlete data. If a metric is missing, say it is not in the data.
-- You are not a doctor. For pain, injury, or medical questions, acknowledge the concern briefly and tell them to flag it with their coach or a medical professional rather than giving medical advice.
+- ${GROUNDING_INSTRUCTION} ${MISSING_METRIC_DISCLOSE}
+- ${MEDICAL_DISCLAIMER} ${MEDICAL_ESCALATE}
 - Never override or contradict the coach-approved recommendation; defer to it.
 - If the data provided is insufficient to answer confidently, say so plainly.`;
 
@@ -174,6 +208,10 @@ export async function generateAnswer(
   athleteName: string,
   extras: ChatContextExtras = {},
 ): Promise<ChatAnswer> {
+  if (!isOnTopicQuestion(question)) {
+    return { text: OFF_TOPIC_REPLY, source: 'guard' };
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   const context = buildChatContext(entriesRecentFirst, risk, sport, athleteName, extras);
 
@@ -232,6 +270,9 @@ export interface AnswerAthleteQuestionInput {
 /**
  * Load last 14 days of check-ins + latest risk result, generate an answer,
  * persist both messages under athletes/{uid}/aiChat.
+ * All Firestore reads are `athletes/{input.athleteUid}` — the model never
+ * supplies an athlete id.
+ * Clear off-topic questions skip check-in/risk reads (still verify the athlete exists).
  */
 export async function answerAthleteQuestion(
   input: AnswerAthleteQuestionInput,
@@ -242,52 +283,59 @@ export async function answerAthleteQuestion(
   if (!athleteDoc.exists) {
     throw new Error('Athlete profile not found.');
   }
-  const athleteData = athleteDoc.data()!;
-  const forCoach = input.callerUid !== input.athleteUid;
-  const privacy = parsePrivacySettings(athleteData.privacySettings);
 
-  const since = Timestamp.fromDate(new Date(Date.now() - 14 * 24 * 60 * 60 * 1000));
-  const snap = await athleteRef
-    .collection('checkins')
-    .where('date', '>=', since)
-    .orderBy('date', 'desc')
-    .limit(14)
-    .get();
+  let answer: ChatAnswer;
 
-  const entries: DailyEntry[] = snap.docs.map((d) => {
-    const data = d.data();
-    const durationMin = data.sessionDurationMinutes ?? 0;
-    const rpe = data.rpe ?? 0;
-    return {
-      date: checkInDateKey(d.id, data),
-      trainingLoad: durationMin * rpe,
-      sleepHours: data.sleepHours ?? null,
-      restingHeartRate: data.restingHeartRate ?? null,
-      hrv: data.hrv ?? null,
-      fatigueScore: data.fatigueScore ?? 3,
-      sessionSport: typeof data.sessionSport === 'string' ? data.sessionSport : null,
-      sessionSportGroup:
-        typeof data.sessionSportGroup === 'string' ? data.sessionSportGroup : null,
-    };
-  });
+  if (!isOnTopicQuestion(input.question)) {
+    answer = { text: OFF_TOPIC_REPLY, source: 'guard' };
+  } else {
+    const athleteData = athleteDoc.data()!;
+    const forCoach = input.callerUid !== input.athleteUid;
+    const privacy = parsePrivacySettings(athleteData.privacySettings);
 
-  const riskSnap = await athleteRef.collection('riskResults').doc('latest').get();
-  const riskData = riskSnap.data();
-  const risk = riskFromDoc(riskData);
+    const since = Timestamp.fromDate(new Date(Date.now() - 14 * 24 * 60 * 60 * 1000));
+    const snap = await athleteRef
+      .collection('checkins')
+      .where('date', '>=', since)
+      .orderBy('date', 'desc')
+      .limit(14)
+      .get();
 
-  const answer = await generateAnswer(
-    input.question,
-    entries,
-    risk,
-    sportsLabel(athleteData) || wordingSport(athleteData, entries[0]).sport,
-    athleteData.name || 'Athlete',
-    {
-      recommendation: riskData?.recommendation ?? null,
-      recommendationStatus: riskData?.recommendationStatus ?? null,
-      privacy,
-      forCoach,
-    },
-  );
+    const entries: DailyEntry[] = snap.docs.map((d) => {
+      const data = d.data();
+      const durationMin = data.sessionDurationMinutes ?? 0;
+      const rpe = data.rpe ?? 0;
+      return {
+        date: checkInDateKey(d.id, data),
+        trainingLoad: durationMin * rpe,
+        sleepHours: data.sleepHours ?? null,
+        restingHeartRate: data.restingHeartRate ?? null,
+        hrv: data.hrv ?? null,
+        fatigueScore: data.fatigueScore ?? 3,
+        sessionSport: typeof data.sessionSport === 'string' ? data.sessionSport : null,
+        sessionSportGroup:
+          typeof data.sessionSportGroup === 'string' ? data.sessionSportGroup : null,
+      };
+    });
+
+    const riskSnap = await athleteRef.collection('riskResults').doc('latest').get();
+    const riskData = riskSnap.data();
+    const risk = riskFromDoc(riskData);
+
+    answer = await generateAnswer(
+      input.question,
+      entries,
+      risk,
+      sportsLabel(athleteData) || wordingSport(athleteData, entries[0]).sport,
+      athleteData.name || 'Athlete',
+      {
+        recommendation: riskData?.recommendation ?? null,
+        recommendationStatus: riskData?.recommendationStatus ?? null,
+        privacy,
+        forCoach,
+      },
+    );
+  }
 
   const chat = athleteRef.collection('aiChat');
   const askedAt = new Date();
